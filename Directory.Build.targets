@@ -1,0 +1,20 @@
+<Project>
+
+  <!--
+    Repo-local equivalent of the props shipped in the NuGet package, so that projects referencing the
+    library by ProjectReference behave the way package consumers do.
+  -->
+  <ItemGroup Condition="'$(ScarletJsonIgnoreConditionConsumer)' == 'true'">
+    <CompilerVisibleProperty Include="ScarletJsonIgnoreConditionAutoRegister" />
+  </ItemGroup>
+
+  <Target Name="RemoveScarletJsonIgnoreConditionGenerator"
+          BeforeTargets="CoreCompile"
+          Condition="'$(ScarletJsonIgnoreConditionGenerator)' == 'false'">
+    <ItemGroup>
+      <Analyzer Remove="@(Analyzer)"
+                Condition="'%(Filename)' == 'Scarlet.System.Text.Json.IgnoreCondition.SourceGeneration'" />
+    </ItemGroup>
+  </Target>
+
+</Project>

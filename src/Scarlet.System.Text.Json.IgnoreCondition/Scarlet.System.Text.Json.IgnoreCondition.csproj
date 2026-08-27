@@ -1,0 +1,49 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>Scarlet.Text.Json</RootNamespace>
+    <IsPackable>true</IsPackable>
+    <IsAotCompatible>true</IsAotCompatible>
+    <IsTrimmable>true</IsTrimmable>
+    <EnableTrimAnalyzer>true</EnableTrimAnalyzer>
+    <EnableAotAnalyzer>true</EnableAotAnalyzer>
+    <EnableSingleFileAnalyzer>true</EnableSingleFileAnalyzer>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <PackageId>Scarlet.System.Text.Json.IgnoreCondition</PackageId>
+    <Description>Adds JsonIgnoreCondition.WhenReadingNull (and the rest of the read/write ignore matrix) to System.Text.Json, for both the reflection-based and source-generated serializers. Implements dotnet/runtime#90011 and dotnet/runtime#62086 as a library.</Description>
+    <PackageTags>json;system.text.json;serialization;jsonignore;whenreadingnull;source-generator;aot</PackageTags>
+    <DevelopmentDependency>false</DevelopmentDependency>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Scarlet.System.Text.Json.IgnoreCondition.SourceGeneration\Scarlet.System.Text.Json.IgnoreCondition.SourceGeneration.csproj"
+                      ReferenceOutputAssembly="false"
+                      OutputItemType="Analyzer"
+                      SetTargetFramework="TargetFramework=netstandard2.0"
+                      UndefineProperties="PublishTrimmed;PublishAot;PublishSingleFile;SelfContained;RuntimeIdentifier"
+                      PrivateAssets="all" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="build\Scarlet.System.Text.Json.IgnoreCondition.props" Pack="true" PackagePath="build\" />
+    <None Include="..\..\README.md" Pack="true" PackagePath="\" Condition="Exists('..\..\README.md')" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <PackageReadmeFile Condition="Exists('..\..\README.md')">README.md</PackageReadmeFile>
+    <TargetsForTfmSpecificContentInPackage>$(TargetsForTfmSpecificContentInPackage);PackGenerator</TargetsForTfmSpecificContentInPackage>
+  </PropertyGroup>
+
+  <Target Name="PackGenerator">
+    <MSBuild Projects="..\Scarlet.System.Text.Json.IgnoreCondition.SourceGeneration\Scarlet.System.Text.Json.IgnoreCondition.SourceGeneration.csproj"
+             Targets="Build"
+             Properties="Configuration=$(Configuration);TargetFramework=netstandard2.0">
+      <Output TaskParameter="TargetOutputs" ItemName="_GeneratorOutput" />
+    </MSBuild>
+    <ItemGroup>
+      <TfmSpecificPackageFile Include="@(_GeneratorOutput)" PackagePath="analyzers\dotnet\cs\%(Filename)%(Extension)" />
+    </ItemGroup>
+  </Target>
+
+</Project>

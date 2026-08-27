@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>Scarlet.Text.Json.Tests</RootNamespace>
+    <IsTestProject>true</IsTestProject>
+
+    <!-- The whole point of this project: the same behaviour with no compile-time registry, so the
+         attributes have to be discovered by reflection instead. -->
+    <ScarletJsonIgnoreConditionGenerator>false</ScarletJsonIgnoreConditionGenerator>
+    <DefineConstants>$(DefineConstants);SCARLET_REFLECTION_FALLBACK</DefineConstants>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit.v3" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Scarlet.System.Text.Json.IgnoreCondition\Scarlet.System.Text.Json.IgnoreCondition.csproj" />
+    <ProjectReference Include="..\..\src\Scarlet.System.Text.Json.IgnoreCondition.SourceGeneration\Scarlet.System.Text.Json.IgnoreCondition.SourceGeneration.csproj"
+                      ReferenceOutputAssembly="false"
+                      OutputItemType="Analyzer"
+                      SetTargetFramework="TargetFramework=netstandard2.0"
+                      UndefineProperties="PublishTrimmed;PublishAot;PublishSingleFile;SelfContained;RuntimeIdentifier" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="..\Scarlet.System.Text.Json.IgnoreCondition.Tests\Shared\**\*.cs" LinkBase="Shared" />
+  </ItemGroup>
+
+</Project>
