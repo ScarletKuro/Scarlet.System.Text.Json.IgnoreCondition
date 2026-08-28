@@ -1,9 +1,9 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Text.Json;
 using System.Text.Json.Serialization.Metadata;
-using Scarlet.Text.Json.Internal;
+using Scarlet.System.Text.Json.IgnoreCondition.Internal;
 
-namespace Scarlet.Text.Json.Serialization;
+namespace Scarlet.System.Text.Json.IgnoreCondition;
 
 /// <summary>
 /// A contract resolver that makes <see cref="JsonIgnoreExAttribute"/> take effect, by applying the

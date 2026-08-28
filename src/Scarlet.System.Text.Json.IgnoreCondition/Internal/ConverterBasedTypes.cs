@@ -2,7 +2,7 @@ using System.Numerics;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 
-namespace Scarlet.Text.Json.Internal;
+namespace Scarlet.System.Text.Json.IgnoreCondition.Internal;
 
 /// <summary>
 /// Decides whether a member type is handled by a "value" converter, i.e. one that reads and writes a

@@ -2,9 +2,8 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Running;
-using Scarlet.Text.Json.Serialization;
 
-namespace Scarlet.Text.Json.Benchmarks;
+namespace Scarlet.System.Text.Json.IgnoreCondition.Benchmarks;
 
 internal static class Program
 {

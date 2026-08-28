@@ -2,9 +2,8 @@ using System.Reflection;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.Json.Serialization.Metadata;
-using Scarlet.Text.Json.Serialization;
 
-namespace Scarlet.Text.Json.Internal;
+namespace Scarlet.System.Text.Json.IgnoreCondition.Internal;
 
 /// <summary>
 /// Applies <see cref="JsonIgnoreExAttribute"/> to a resolved contract.

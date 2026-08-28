@@ -63,7 +63,7 @@ Targets **net10.0**. No source generator, no analyzer, no MSBuild integration â€
 Annotate members, then set `ExtendedIgnoreConditionResolver` as the resolver.
 
 ```csharp
-using Scarlet.Text.Json.Serialization;
+using Scarlet.System.Text.Json.IgnoreCondition;
 
 // Source-generated, including NativeAOT â€” no reflection over your model
 options.TypeInfoResolver = new ExtendedIgnoreConditionResolver(MyJsonContext.Default);

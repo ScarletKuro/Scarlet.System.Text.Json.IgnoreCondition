@@ -1,9 +1,8 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.Json.Serialization.Metadata;
-using Scarlet.Text.Json.Serialization;
 
-namespace Scarlet.Text.Json.Tests;
+namespace Scarlet.System.Text.Json.IgnoreCondition.Tests;
 
 /// <summary>How the contract for a test is resolved.</summary>
 /// <remarks>

@@ -1,4 +1,4 @@
-namespace Scarlet.Text.Json.Serialization;
+namespace Scarlet.System.Text.Json.IgnoreCondition;
 
 /// <summary>
 /// Controls how a property or field is ignored during serialization and deserialization.

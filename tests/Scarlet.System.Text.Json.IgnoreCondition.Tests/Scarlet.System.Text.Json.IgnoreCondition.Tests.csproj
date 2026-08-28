@@ -2,7 +2,7 @@
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
-    <RootNamespace>Scarlet.Text.Json.Tests</RootNamespace>
+    <RootNamespace>Scarlet.System.Text.Json.IgnoreCondition.Tests</RootNamespace>
     <IsTestProject>true</IsTestProject>
   </PropertyGroup>
 

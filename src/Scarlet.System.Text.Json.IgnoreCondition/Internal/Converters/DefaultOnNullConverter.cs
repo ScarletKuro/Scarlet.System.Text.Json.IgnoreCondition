@@ -2,7 +2,7 @@ using System.Diagnostics.CodeAnalysis;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
-namespace Scarlet.Text.Json.Internal.Converters;
+namespace Scarlet.System.Text.Json.IgnoreCondition.Internal.Converters;
 
 /// <summary>
 /// Substitutes a fixed value for an incoming JSON <c>null</c> instead of letting

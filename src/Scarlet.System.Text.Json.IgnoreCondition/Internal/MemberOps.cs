@@ -5,9 +5,9 @@ using System.Runtime.CompilerServices;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.Json.Serialization.Metadata;
-using Scarlet.Text.Json.Internal.Converters;
+using Scarlet.System.Text.Json.IgnoreCondition.Internal.Converters;
 
-namespace Scarlet.Text.Json.Internal;
+namespace Scarlet.System.Text.Json.IgnoreCondition.Internal;
 
 /// <summary>
 /// The operations on a member that need the member type as a generic argument rather than as a
@@ -170,7 +170,7 @@ internal class MemberOps<T> : MemberOps
 internal sealed class ValueMemberOps<T> : MemberOps<T>
     where T : struct
 {
-    public static new readonly ValueMemberOps<T> Instance = new();
+    public new static readonly ValueMemberOps<T> Instance = new();
 
     public override bool SupportsNullableProjection => true;
 

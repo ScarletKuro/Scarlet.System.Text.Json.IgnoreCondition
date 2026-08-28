@@ -1,9 +1,8 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using Scarlet.Text.Json.Serialization;
 using Xunit;
 
-namespace Scarlet.Text.Json.Tests;
+namespace Scarlet.System.Text.Json.IgnoreCondition.Tests;
 
 /// <summary>
 /// Cases where a read-side condition cannot be honoured. Each one has to fail loudly, naming the member

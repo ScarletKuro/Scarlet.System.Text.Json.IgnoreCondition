@@ -1,6 +1,5 @@
-using Scarlet.Text.Json.Serialization;
 
-namespace Scarlet.Text.Json.Internal;
+namespace Scarlet.System.Text.Json.IgnoreCondition.Internal;
 
 /// <summary>Classifies <see cref="JsonIgnoreConditionEx"/> members by the side they act on.</summary>
 internal static class ConditionKinds

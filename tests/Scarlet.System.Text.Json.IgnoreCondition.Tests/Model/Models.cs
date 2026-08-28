@@ -1,7 +1,6 @@
 using System.Text.Json.Serialization;
-using Scarlet.Text.Json.Serialization;
 
-namespace Scarlet.Text.Json.Tests;
+namespace Scarlet.System.Text.Json.IgnoreCondition.Tests;
 
 public enum Season
 {

@@ -2,7 +2,7 @@ using System.Diagnostics.CodeAnalysis;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
-namespace Scarlet.Text.Json.Internal.Converters;
+namespace Scarlet.System.Text.Json.IgnoreCondition.Internal.Converters;
 
 /// <summary>
 /// Lifts a <see cref="JsonConverter{T}"/> over a non-nullable value type to one over

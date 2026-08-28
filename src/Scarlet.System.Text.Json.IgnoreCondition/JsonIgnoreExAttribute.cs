@@ -1,6 +1,6 @@
 using System.Text.Json.Serialization;
 
-namespace Scarlet.Text.Json.Serialization;
+namespace Scarlet.System.Text.Json.IgnoreCondition;
 
 /// <summary>
 /// Prevents a property or field from being serialized or deserialized under the specified condition,

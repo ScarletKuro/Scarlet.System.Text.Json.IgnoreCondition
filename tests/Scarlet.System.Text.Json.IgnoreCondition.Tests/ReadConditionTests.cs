@@ -1,7 +1,7 @@
 using System.Text.Json;
 using Xunit;
 
-namespace Scarlet.Text.Json.Tests;
+namespace Scarlet.System.Text.Json.IgnoreCondition.Tests;
 
 /// <summary>
 /// The behaviour the library exists for: an incoming JSON null leaves the member at the value the

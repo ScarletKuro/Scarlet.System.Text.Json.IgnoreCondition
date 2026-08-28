@@ -3,7 +3,7 @@ using System.Reflection;
 using System.Text.Json.Serialization;
 using System.Text.Json.Serialization.Metadata;
 
-namespace Scarlet.Text.Json.Internal;
+namespace Scarlet.System.Text.Json.IgnoreCondition.Internal;
 
 /// <summary>
 /// The parameters of the constructor the serializer will deserialize through, if any.

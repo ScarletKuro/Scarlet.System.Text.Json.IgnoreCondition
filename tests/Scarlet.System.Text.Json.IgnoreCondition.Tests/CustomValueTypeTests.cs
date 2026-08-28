@@ -1,8 +1,7 @@
 using System.Text.Json;
-using Scarlet.Text.Json.Serialization;
 using Xunit;
 
-namespace Scarlet.Text.Json.Tests;
+namespace Scarlet.System.Text.Json.IgnoreCondition.Tests;
 
 /// <summary>
 /// Value types the library does not root itself: a struct with members of its own, and a user enum.

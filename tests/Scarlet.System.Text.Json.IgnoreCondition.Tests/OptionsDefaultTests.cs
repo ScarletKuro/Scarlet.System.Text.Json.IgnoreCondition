@@ -1,8 +1,7 @@
 using System.Text.Json;
-using Scarlet.Text.Json.Serialization;
 using Xunit;
 
-namespace Scarlet.Text.Json.Tests;
+namespace Scarlet.System.Text.Json.IgnoreCondition.Tests;
 
 /// <summary>
 /// The options-level default, which is the replacement for the read-side half of the obsolete

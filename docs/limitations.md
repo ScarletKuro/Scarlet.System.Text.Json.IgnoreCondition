@@ -77,6 +77,31 @@ Two things to know:
   `DefaultJsonTypeInfoResolver`, and is annotated `[RequiresUnreferencedCode]`/`[RequiresDynamicCode]`
   accordingly. Pass a source-generated context instead.
 
+## The namespace shadows `System` inside a `Scarlet.*` namespace
+
+`Scarlet.System.Text.Json.IgnoreCondition` matches the package id and the convention used by
+`Scarlet.System.Text.Json.DateTimeConverter`, at one cost: inside a namespace that begins with
+`Scarlet`, the name `System` resolves to `Scarlet.System` first. Fully qualifying a BCL type inline then
+fails to compile:
+
+```csharp
+namespace Scarlet.Api;
+
+// error CS0234: The type or namespace name 'JsonSerializer' does not exist in the
+//               namespace 'Scarlet.System.Text.Json'
+var x = System.Text.Json.JsonSerializer.Deserialize<Config>(json, options);
+```
+
+Use a `using` directive, as normal C# style does anyway, and nothing is affected:
+
+```csharp
+using System.Text.Json;      // resolved in global scope, above the namespace declaration
+
+var x = JsonSerializer.Deserialize<Config>(json, options);
+```
+
+`global::System.Text.Json.JsonSerializer` also works if you must qualify inline.
+
 ## Out of scope
 
 - Nulls **inside** collections and dictionaries (`{"Values":[null]}`). The conditions act on members, not

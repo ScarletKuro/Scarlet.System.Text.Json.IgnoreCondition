@@ -1,7 +1,7 @@
 using System.Text.Json;
 using Xunit;
 
-namespace Scarlet.Text.Json.Tests;
+namespace Scarlet.System.Text.Json.IgnoreCondition.Tests;
 
 /// <summary>
 /// Members bound to a deserialization constructor parameter never go through a setter, so the

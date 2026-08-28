@@ -1,9 +1,8 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.Json.Serialization.Metadata;
-using Scarlet.Text.Json.Serialization;
 
-namespace Scarlet.Text.Json.AotSample;
+namespace Scarlet.System.Text.Json.IgnoreCondition.AotSample;
 
 /// <summary>
 /// Published with <c>PublishAot</c> and with reflection-based serialization switched off, so the build

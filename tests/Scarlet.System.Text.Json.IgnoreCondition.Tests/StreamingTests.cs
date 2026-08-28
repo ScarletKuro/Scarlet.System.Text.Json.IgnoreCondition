@@ -2,7 +2,7 @@ using System.Text;
 using System.Text.Json;
 using Xunit;
 
-namespace Scarlet.Text.Json.Tests;
+namespace Scarlet.System.Text.Json.IgnoreCondition.Tests;
 
 /// <summary>
 /// Streaming and concurrency, which is where a mechanism that carried state between reading a value

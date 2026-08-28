@@ -1,6 +1,6 @@
-using Scarlet.Text.Json.Internal;
+using Scarlet.System.Text.Json.IgnoreCondition.Internal;
 
-namespace Scarlet.Text.Json.Serialization;
+namespace Scarlet.System.Text.Json.IgnoreCondition;
 
 /// <summary>
 /// Configures how <see cref="ExtendedIgnoreConditionResolver"/> applies
