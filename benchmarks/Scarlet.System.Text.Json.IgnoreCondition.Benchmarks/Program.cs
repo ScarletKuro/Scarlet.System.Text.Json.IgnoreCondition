@@ -20,8 +20,6 @@ internal static class Program
 /// modifier leaves contracts it has nothing to say about completely untouched.
 /// </summary>
 [MemoryDiagnoser]
-// In-process: the analyzer ProjectReference does not survive the relocated build that the
-// default toolchain generates, and the comparison here is relative in any case.
 [InProcess]
 public class IgnoreConditionBenchmarks
 {
@@ -40,7 +38,7 @@ public class IgnoreConditionBenchmarks
         _baseline = new JsonSerializerOptions { TypeInfoResolver = BenchmarkContext.Default };
         _extended = new JsonSerializerOptions
         {
-            TypeInfoResolver = BenchmarkContext.Default.WithExtendedIgnoreConditions(),
+            TypeInfoResolver = new ExtendedIgnoreConditionResolver(BenchmarkContext.Default),
         };
 
         _annotated = JsonSerializer.Deserialize<AnnotatedModel>(AnnotatedJson, _baseline)!;

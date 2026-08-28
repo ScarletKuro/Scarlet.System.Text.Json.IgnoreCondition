@@ -13,7 +13,10 @@ public sealed class Settings
     public int RetryCount { get; set; } = 3;
 }
 
-var options = new JsonSerializerOptions().AddExtendedIgnoreConditions();
+var options = new JsonSerializerOptions
+{
+    TypeInfoResolver = new ExtendedIgnoreConditionResolver(),
+};
 
 var settings = JsonSerializer.Deserialize<Settings>("""{"Endpoint":null,"RetryCount":null}""", options);
 // settings.Endpoint == "https://localhost"
@@ -53,28 +56,25 @@ customization.
 dotnet add package Scarlet.System.Text.Json.IgnoreCondition
 ```
 
-One package reference gives you the runtime library and the Roslyn generator that registers your
-annotated types at compile time. Targets **net10.0**.
+Targets **net10.0**. No source generator, no analyzer, no MSBuild integration — one assembly.
 
 ## Use
 
-Annotate members, then install the contract customization once per `JsonSerializerOptions`.
+Annotate members, then set `ExtendedIgnoreConditionResolver` as the resolver.
 
 ```csharp
 using Scarlet.Text.Json.Serialization;
 
-// Reflection-based serialization
-var options = new JsonSerializerOptions().AddExtendedIgnoreConditions();
+// Source-generated, including NativeAOT — no reflection over your model
+options.TypeInfoResolver = new ExtendedIgnoreConditionResolver(MyJsonContext.Default);
 
-// Source-generated / NativeAOT — no reflection anywhere on this path
-var options = new JsonSerializerOptions
-{
-    TypeInfoResolver = MyContext.Default.WithExtendedIgnoreConditions(),
-};
+// Reflection-based
+options.TypeInfoResolver = new ExtendedIgnoreConditionResolver();
 
-// Alongside other contract customizations
-var resolver = new DefaultJsonTypeInfoResolver();
-resolver.Modifiers.Add(ScarletJsonIgnoreConditionExtensions.CreateModifier());
+// Composing with your own contract customizations: wrap whatever produced the metadata
+var mine = new DefaultJsonTypeInfoResolver();
+mine.Modifiers.Add(MyModifier);
+options.TypeInfoResolver = new ExtendedIgnoreConditionResolver(mine);
 ```
 
 The attribute may be applied twice to combine one read-side condition with one write-side condition:
@@ -88,7 +88,7 @@ public string? Name { get; set; } = "initial";
 ### Records and constructor parameters
 
 A member bound to a deserialization constructor parameter has no setter to intercept, so an incoming
-null falls back to the parameter's own default value:
+null falls back to the parameter's own default value. Target the generated property explicitly:
 
 ```csharp
 public sealed record Credentials(
@@ -97,15 +97,14 @@ public sealed record Credentials(
 // {"User":null} -> User == "anonymous"
 ```
 
-Writing the attribute directly on the positional parameter (without `property:`) works too.
-
 ### Replacing `IgnoreNullValues` wholesale
 
 To restore the read-side behaviour of the obsolete `IgnoreNullValues` across every type, set an
 options-level default. Individual members opt out with `Never`.
 
 ```csharp
-var options = new JsonSerializerOptions().AddExtendedIgnoreConditions(
+options.TypeInfoResolver = new ExtendedIgnoreConditionResolver(
+    MyJsonContext.Default,
     new ExtendedIgnoreConditionSettings
     {
         DefaultReadCondition = JsonIgnoreConditionEx.WhenReadingNull,
@@ -114,8 +113,10 @@ var options = new JsonSerializerOptions().AddExtendedIgnoreConditions(
 
 ## How it works
 
-Three mechanisms, because the serializer reaches the three shapes of member differently. All of them
-are ordinary contract customization — no reflection into serializer internals.
+The resolver walks `JsonTypeInfo.Properties` and reads each member's attributes from
+`JsonPropertyInfo.AttributeProvider` — which the reflection-based resolver and the `System.Text.Json`
+source generator both populate, so one implementation serves both. Then, per member, one of three
+mechanisms, because the serializer reaches the three shapes of member differently:
 
 | Member | Mechanism |
 | --- | --- |
@@ -123,42 +124,48 @@ are ordinary contract customization — no reflection into serializer internals.
 | Settable, non-nullable value type | The contract re-declares the member as `T?` with the same accessors and the serializer's own `Nullable<T>` converter. The null is then read rather than rejected, and the wrapped setter drops it. |
 | Bound to a constructor parameter | The property's converter is intercepted and substitutes the parameter's default value for a null. |
 
-The Roslyn generator emits one registration per annotated type and calls it from a module
-initializer, passing each member type as a generic argument. That is what keeps the whole path free of
-`MakeGenericType`, and therefore NativeAOT-safe. Assemblies that disable the generator fall back to
-reading the attributes by reflection.
+Mistakes surface as a `NotSupportedException` naming the member and the reason, the first time the
+contract is resolved — a read-side condition on a `required` member, on the extension data member, on a
+member with no setter, two conditions on the same side, and so on. See
+[docs/limitations.md](docs/limitations.md).
 
-Misuse is caught at compile time by eleven analyzer rules (`SJIC001`–`SJIC011`) — a read-side
-condition on a `required` member, `[JsonIgnoreEx]` next to `[JsonIgnore]`, two conditions on the same
-side, and so on.
+### NativeAOT
+
+The value-type mechanisms need metadata for `Nullable<T>`, which is a generic instantiation over the
+member type. The library roots that for every built-in value type, so nothing is created at run time for
+the common cases. For a **custom enum or struct** under NativeAOT, register it once at startup:
+
+```csharp
+ExtendedIgnoreConditionResolver.RegisterValueType<LogLevel>();
+```
+
+Skip it and the condition is refused with a message that tells you to add exactly that line. Everything
+else — reference types, `Nullable<T>`, collections, constructor parameters of reference type — needs no
+registration.
 
 ## Performance
 
-`net10.0`, in-process BenchmarkDotNet, a four-member model through a source-generated context:
+Three findings, each of which reproduced across every run of
+`benchmarks/Scarlet.System.Text.Json.IgnoreCondition.Benchmarks` (net10.0, in-process BenchmarkDotNet, a
+four-member model through a source-generated context):
 
-| | ns | vs. baseline |
-| --- | --- | --- |
-| serialize unannotated type, library not installed | 255.9 | 1.00 |
-| serialize unannotated type, library installed | 256.1 | 1.00 |
-| serialize annotated type, library not installed | 254.2 | 0.99 |
-| serialize annotated type, library installed | 359.4 | 1.40 |
-| deserialize annotated type, values present | 591.4 | — |
-| deserialize annotated type, all nulls skipped | 355.6 | — |
-| deserialize unannotated type, library installed | 599.4 | — |
+- **Unannotated types cost nothing.** Serializing a type with no conditions measures the same with the
+  library installed as without it, because the resolver leaves contracts it has nothing to say about
+  completely untouched — so they keep the source-generated serialization fast path.
+- **Annotated types lose that fast path**, costing roughly 1.3–1.4× on serialization. Customizing a
+  `JsonTypeInfo` sets the serializer's internal `IsCustomized` flag, which disables the generated fast
+  path for that type. Every possible implementation of this feature pays that cost; the library confines
+  it to the types that actually carry a condition.
+- **Reading is not measurably slower.** Deserializing an annotated type measures the same as an
+  unannotated one, and skipping a null is cheaper than assigning one (roughly 0.6× of a full read).
 
-Two things to read from this:
+Absolute numbers are deliberately not quoted: the runs available were on a busy developer machine, with
+standard deviations of 10–30%, which is enough to compare the pairs above but not to publish figures.
+Measure on your own hardware with:
 
-- **Unannotated types cost nothing.** The modifier leaves contracts it has nothing to say about
-  completely untouched, so they keep the source-generated serialization fast path.
-- **Annotated types lose that fast path** (~1.4× on serialization). Customizing a `JsonTypeInfo` sets
-  the serializer's internal `IsCustomized` flag, which disables the generated fast path for that type.
-  Every possible implementation of this feature pays that cost; the library confines it to the types
-  that actually carry a condition.
-- Reading is not measurably slower — skipping a null is in fact cheaper than assigning one.
-
-## Limitations
-
-See [docs/limitations.md](docs/limitations.md).
+```
+dotnet run --project benchmarks/Scarlet.System.Text.Json.IgnoreCondition.Benchmarks -c Release -- --filter '*'
+```
 
 ## Licence
 

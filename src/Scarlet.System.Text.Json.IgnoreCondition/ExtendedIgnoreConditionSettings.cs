@@ -3,8 +3,8 @@ using Scarlet.Text.Json.Internal;
 namespace Scarlet.Text.Json.Serialization;
 
 /// <summary>
-/// Configures how <see cref="JsonIgnoreExAttribute"/> is applied to a
-/// <see cref="global::System.Text.Json.JsonSerializerOptions"/> instance.
+/// Configures how <see cref="ExtendedIgnoreConditionResolver"/> applies
+/// <see cref="JsonIgnoreExAttribute"/>.
 /// </summary>
 public sealed class ExtendedIgnoreConditionSettings
 {
@@ -67,24 +67,10 @@ public sealed class ExtendedIgnoreConditionSettings
     }
 
     /// <summary>
-    /// Gets or sets a value indicating whether <see cref="JsonIgnoreExAttribute"/> may be discovered
-    /// by reflection for types the compile-time registry does not cover. The default is
-    /// <see langword="true"/>.
-    /// </summary>
-    /// <remarks>
-    /// Reflection discovery is neither trim- nor NativeAOT-safe. Set this to <see langword="false"/>
-    /// to guarantee that only registry entries emitted by the source generator are honoured, so that a
-    /// missing registration fails loudly instead of silently working on one platform only.
-    /// </remarks>
-    public bool AllowReflectionFallback { get; set; } = true;
-
-    /// <summary>
     /// Gets or sets what happens when a condition cannot be applied to a member. The default is
     /// <see cref="UnsupportedMemberBehavior.Throw"/>.
     /// </summary>
     public UnsupportedMemberBehavior UnsupportedMemberBehavior { get; set; } = UnsupportedMemberBehavior.Throw;
-
-    internal bool HasDefaults => _defaultReadCondition is not null || _defaultWriteCondition is not null;
 }
 
 /// <summary>Describes what happens when an ignore condition cannot be applied to a member.</summary>

@@ -88,14 +88,6 @@ public sealed record RecordModel(
     [property: JsonIgnoreEx(JsonIgnoreConditionEx.WhenReadingNull)] int Age = 41,
     [property: JsonIgnoreEx(JsonIgnoreConditionEx.WhenReadingNull)] string? Nickname = null);
 
-/// <summary>
-/// The same, annotated directly on the positional parameters, which is where the compiler puts the
-/// attribute when no <c>property:</c> target is given.
-/// </summary>
-public sealed record ParameterRecordModel(
-    [JsonIgnoreEx(JsonIgnoreConditionEx.WhenReadingNull)] string Name = "unknown",
-    [JsonIgnoreEx(JsonIgnoreConditionEx.WhenReadingNull)] int Age = 41);
-
 /// <summary>A constructor parameter with no default, which can only fall back to the type default.</summary>
 public sealed record RequiredParameterRecordModel(
     [property: JsonIgnoreEx(JsonIgnoreConditionEx.WhenReadingNull)] string Name);
@@ -246,4 +238,45 @@ public sealed class NumberHandlingModel
     [JsonNumberHandling(JsonNumberHandling.AllowReadingFromString | JsonNumberHandling.WriteAsString)]
     [JsonIgnoreEx(JsonIgnoreConditionEx.WhenReadingNull)]
     public double Ratio { get; set; } = 1.5;
+}
+
+/// <summary>A struct with its own members, so the projection has to reuse a non-primitive converter.</summary>
+public readonly record struct Point(int X, int Y);
+
+/// <summary>A value type the library's rooted table does not know about.</summary>
+public enum Priority
+{
+    Low,
+    Normal,
+    High,
+}
+
+public sealed class CustomValueTypeModel
+{
+    [JsonIgnoreEx(JsonIgnoreConditionEx.WhenReadingNull)]
+    public Point Location { get; set; } = new(3, 4);
+
+    [JsonIgnoreEx(JsonIgnoreConditionEx.WhenReadingNull)]
+    public Priority Priority { get; set; } = Priority.High;
+}
+
+/// <summary>A generic model: the resolver reads attributes per closed contract, so this just works.</summary>
+public sealed class GenericModel<T>
+{
+    [JsonIgnoreEx(JsonIgnoreConditionEx.WhenReadingNull)]
+    public T? Value { get; set; }
+
+    [JsonIgnoreEx(JsonIgnoreConditionEx.WhenReadingNull)]
+    public int Count { get; set; } = 5;
+}
+
+/// <summary>[JsonIgnore] removes the member before the resolver ever sees it.</summary>
+public sealed class IgnoredMemberModel
+{
+    [JsonIgnore]
+    [JsonIgnoreEx(JsonIgnoreConditionEx.WhenReadingNull)]
+    public string? Hidden { get; set; } = "initial";
+
+    [JsonIgnoreEx(JsonIgnoreConditionEx.WhenReadingNull)]
+    public string? Visible { get; set; } = "initial";
 }

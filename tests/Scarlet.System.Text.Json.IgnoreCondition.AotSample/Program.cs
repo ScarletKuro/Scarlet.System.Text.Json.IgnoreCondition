@@ -14,9 +14,14 @@ internal static class Program
 {
     private static int Main()
     {
+        // LogLevel is a user enum, so its metadata is not one of the entries the library roots for
+        // itself. Registering it is what makes the condition work where the runtime cannot create a
+        // generic instantiation on demand.
+        ExtendedIgnoreConditionResolver.RegisterValueType<LogLevel>();
+
         var options = new JsonSerializerOptions
         {
-            TypeInfoResolver = SampleContext.Default.WithExtendedIgnoreConditions(),
+            TypeInfoResolver = new ExtendedIgnoreConditionResolver(SampleContext.Default),
         };
 
         var settings = (JsonTypeInfo<Settings>)options.GetTypeInfo(typeof(Settings));

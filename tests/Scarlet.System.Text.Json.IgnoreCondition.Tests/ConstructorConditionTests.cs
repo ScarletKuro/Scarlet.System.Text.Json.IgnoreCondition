@@ -53,22 +53,6 @@ public sealed class ConstructorConditionTests
         Assert.Equal(41, model.Age);
     }
 
-    /// <summary>
-    /// The attribute written straight on a positional parameter, which is where the compiler puts it
-    /// without a <c>property:</c> target.
-    /// </summary>
-    [Theory]
-    [MemberData(nameof(Configurations))]
-    public void A_condition_on_the_parameter_itself_is_honoured(SerializerConfiguration configuration)
-    {
-        JsonSerializerOptions options = Serializers.Create(configuration);
-
-        ParameterRecordModel model = Deserialize<ParameterRecordModel>("""{"Name":null,"Age":null}""", options);
-
-        Assert.Equal("unknown", model.Name);
-        Assert.Equal(41, model.Age);
-    }
-
     [Theory]
     [MemberData(nameof(Configurations))]
     public void A_parameter_without_a_default_falls_back_to_the_type_default(SerializerConfiguration configuration)

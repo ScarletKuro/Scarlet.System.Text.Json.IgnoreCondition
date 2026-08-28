@@ -4,8 +4,6 @@
     <TargetFramework>net10.0</TargetFramework>
     <RootNamespace>Scarlet.Text.Json.Tests</RootNamespace>
     <IsTestProject>true</IsTestProject>
-    <ScarletJsonIgnoreConditionConsumer>true</ScarletJsonIgnoreConditionConsumer>
-    <NoWarn>$(NoWarn);SJIC009</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
@@ -16,11 +14,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Scarlet.System.Text.Json.IgnoreCondition\Scarlet.System.Text.Json.IgnoreCondition.csproj" />
-    <ProjectReference Include="..\..\src\Scarlet.System.Text.Json.IgnoreCondition.SourceGeneration\Scarlet.System.Text.Json.IgnoreCondition.SourceGeneration.csproj"
-                      ReferenceOutputAssembly="false"
-                      OutputItemType="Analyzer"
-                      SetTargetFramework="TargetFramework=netstandard2.0"
-                      UndefineProperties="PublishTrimmed;PublishAot;PublishSingleFile;SelfContained;RuntimeIdentifier" />
   </ItemGroup>
 
 </Project>

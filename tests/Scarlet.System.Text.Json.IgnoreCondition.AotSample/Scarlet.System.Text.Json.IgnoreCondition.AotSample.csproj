@@ -8,7 +8,6 @@
     <IsAotCompatible>true</IsAotCompatible>
     <TrimmerSingleWarn>false</TrimmerSingleWarn>
     <InvariantGlobalization>true</InvariantGlobalization>
-    <ScarletJsonIgnoreConditionConsumer>true</ScarletJsonIgnoreConditionConsumer>
 
     <!-- Reflection-based serialization is off, so nothing can silently fall back to it. -->
     <JsonSerializerIsReflectionEnabledByDefault>false</JsonSerializerIsReflectionEnabledByDefault>
@@ -16,11 +15,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Scarlet.System.Text.Json.IgnoreCondition\Scarlet.System.Text.Json.IgnoreCondition.csproj" />
-    <ProjectReference Include="..\..\src\Scarlet.System.Text.Json.IgnoreCondition.SourceGeneration\Scarlet.System.Text.Json.IgnoreCondition.SourceGeneration.csproj"
-                      ReferenceOutputAssembly="false"
-                      OutputItemType="Analyzer"
-                      SetTargetFramework="TargetFramework=netstandard2.0"
-                      UndefineProperties="PublishTrimmed;PublishAot;PublishSingleFile;SelfContained;RuntimeIdentifier" />
   </ItemGroup>
 
 </Project>

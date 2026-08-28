@@ -1,5 +1,7 @@
+using System.Collections.Concurrent;
 using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.Json.Serialization.Metadata;
@@ -12,13 +14,56 @@ namespace Scarlet.Text.Json.Internal;
 /// <see cref="Type"/> value.
 /// </summary>
 /// <remarks>
-/// The source generator hands the runtime an already-instantiated <see cref="MemberOps{T}"/> or
-/// <see cref="ValueMemberOps{T}"/>, so nothing on the source-generated path needs
-/// <see cref="Type.MakeGenericType"/> or <see cref="Activator"/> and it stays NativeAOT-clean. Only
-/// the reflection fallback goes through <see cref="Create"/>.
+/// <para>
+/// Only two of the three mechanisms need this: projecting a non-nullable value type as <c>T?</c>, and
+/// substituting a constructor parameter's default. Wrapping a setter is done through the non-generic
+/// <c>Action&lt;object, object?&gt;</c> and needs nothing here.
+/// </para>
+/// <para>
+/// <see cref="Resolve"/> answers from a table of statically instantiated entries first, so the common
+/// value types cost no runtime generic instantiation and stay usable under NativeAOT. Reference types
+/// fall back to <see cref="Type.MakeGenericType"/>, which is safe there because the runtime shares one
+/// canonical instantiation across all reference types. A value type that is neither in the table nor
+/// registered by the consumer is the one case that cannot be served without dynamic code.
+/// </para>
 /// </remarks>
 internal abstract class MemberOps
 {
+    private static readonly ConcurrentDictionary<Type, MemberOps> Known = new();
+
+    static MemberOps()
+    {
+        // Rooting these instantiations is what makes the table AOT-safe: the generic code behind each
+        // one is emitted at build time rather than being asked for at run time.
+        Register<bool>();
+        Register<byte>();
+        Register<sbyte>();
+        Register<char>();
+        Register<short>();
+        Register<ushort>();
+        Register<int>();
+        Register<uint>();
+        Register<long>();
+        Register<ulong>();
+        Register<float>();
+        Register<double>();
+        Register<decimal>();
+        Register<Half>();
+        Register<Int128>();
+        Register<UInt128>();
+        Register<Guid>();
+        Register<DateTime>();
+        Register<DateTimeOffset>();
+        Register<DateOnly>();
+        Register<TimeOnly>();
+        Register<TimeSpan>();
+
+        // Roots the shared reference-type instantiation, so MakeGenericType over any reference type
+        // has canonical code to reuse.
+        Known[typeof(string)] = MemberOps<string>.Instance;
+        Known[typeof(object)] = MemberOps<object>.Instance;
+    }
+
     public abstract Type MemberType { get; }
 
     /// <summary>
@@ -49,9 +94,53 @@ internal abstract class MemberOps
     public virtual JsonPropertyInfo? CreateNullableProjection(JsonTypeInfo declaringTypeInfo, JsonPropertyInfo source) =>
         throw new InvalidOperationException($"'{MemberType}' is not a non-nullable value type.");
 
-    [RequiresUnreferencedCode("Instantiates MemberOps<T> for a member type only known at run time.")]
-    [RequiresDynamicCode("Instantiates MemberOps<T> for a member type only known at run time.")]
-    public static MemberOps Create(Type memberType)
+    /// <summary>
+    /// Adds <typeparamref name="T"/> and <c>T?</c> to the table, rooting their generic code.
+    /// </summary>
+    public static void Register<T>()
+        where T : struct
+    {
+        Known[typeof(T)] = ValueMemberOps<T>.Instance;
+        Known[typeof(T?)] = MemberOps<T?>.Instance;
+    }
+
+    /// <summary>
+    /// Returns the operations for a member type, or <see langword="null"/> when they would require
+    /// runtime generic instantiation that this platform cannot provide.
+    /// </summary>
+    public static MemberOps? Resolve(Type memberType)
+    {
+        if (Known.TryGetValue(memberType, out MemberOps? ops))
+        {
+            return ops;
+        }
+
+        // Reference types share one canonical instantiation, which the static constructor rooted;
+        // value types each need their own, which only a JIT can produce on demand.
+        if (memberType.IsValueType && !RuntimeFeature.IsDynamicCodeSupported)
+        {
+            return null;
+        }
+
+        return Known.GetOrAdd(memberType, CreateUnchecked);
+    }
+
+    [UnconditionalSuppressMessage(
+        "AotAnalysis",
+        "IL3050:RequiresDynamicCode",
+        Justification = "Resolve only reaches this for a reference type, whose canonical instantiation " +
+                        "is rooted by the static constructor, or when RuntimeFeature." +
+                        "IsDynamicCodeSupported reports that the instantiation can be produced.")]
+    [UnconditionalSuppressMessage(
+        "TrimAnalysis",
+        "IL2055:MakeGenericType",
+        Justification = "Both candidate types are referenced directly here, so the trimmer keeps them.")]
+    [UnconditionalSuppressMessage(
+        "TrimAnalysis",
+        "IL2071:MakeGenericType",
+        Justification = "MemberOps<T> and ValueMemberOps<T> are referenced directly here, so their " +
+                        "parameterless constructors are kept.")]
+    private static MemberOps CreateUnchecked(Type memberType)
     {
         bool isNonNullableValueType = memberType.IsValueType && Nullable.GetUnderlyingType(memberType) is null;
         Type openOpsType = isNonNullableValueType ? typeof(ValueMemberOps<>) : typeof(MemberOps<>);

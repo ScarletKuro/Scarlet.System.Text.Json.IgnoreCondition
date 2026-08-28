@@ -1,14 +1,15 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Text.Json.Serialization.Metadata;
 using Scarlet.Text.Json.Serialization;
 
 namespace Scarlet.Text.Json.Tests;
 
 /// <summary>How the contract for a test is resolved.</summary>
 /// <remarks>
-/// Every behavioural test runs against all three, and the whole suite runs a second time from the
-/// ReflectionFallback project, where the compile-time registry is switched off and the attributes have
-/// to be discovered by reflection instead. Results must be identical in all six combinations.
+/// Every behavioural test runs against all three, and must produce identical results: the resolver
+/// reads the attribute from JsonPropertyInfo.AttributeProvider, which the reflection-based resolver and
+/// the System.Text.Json source generator both populate.
 /// </remarks>
 public enum SerializerConfiguration
 {
@@ -28,7 +29,6 @@ public enum SerializerConfiguration
 [JsonSerializable(typeof(FieldModel))]
 [JsonSerializable(typeof(StructModel))]
 [JsonSerializable(typeof(RecordModel))]
-[JsonSerializable(typeof(ParameterRecordModel))]
 [JsonSerializable(typeof(RequiredParameterRecordModel))]
 [JsonSerializable(typeof(WriteModel))]
 [JsonSerializable(typeof(CombinedModel))]
@@ -41,6 +41,9 @@ public enum SerializerConfiguration
 [JsonSerializable(typeof(GraphNode))]
 [JsonSerializable(typeof(PopulateModel))]
 [JsonSerializable(typeof(NumberHandlingModel))]
+[JsonSerializable(typeof(CustomValueTypeModel))]
+[JsonSerializable(typeof(GenericModel<string>))]
+[JsonSerializable(typeof(IgnoredMemberModel))]
 [JsonSerializable(typeof(UnannotatedModel))]
 internal sealed partial class DefaultModeContext : JsonSerializerContext;
 
@@ -50,7 +53,6 @@ internal sealed partial class DefaultModeContext : JsonSerializerContext;
 [JsonSerializable(typeof(FieldModel))]
 [JsonSerializable(typeof(StructModel))]
 [JsonSerializable(typeof(RecordModel))]
-[JsonSerializable(typeof(ParameterRecordModel))]
 [JsonSerializable(typeof(RequiredParameterRecordModel))]
 [JsonSerializable(typeof(WriteModel))]
 [JsonSerializable(typeof(CombinedModel))]
@@ -63,6 +65,9 @@ internal sealed partial class DefaultModeContext : JsonSerializerContext;
 [JsonSerializable(typeof(GraphNode))]
 [JsonSerializable(typeof(PopulateModel))]
 [JsonSerializable(typeof(NumberHandlingModel))]
+[JsonSerializable(typeof(CustomValueTypeModel))]
+[JsonSerializable(typeof(GenericModel<string>))]
+[JsonSerializable(typeof(IgnoredMemberModel))]
 [JsonSerializable(typeof(UnannotatedModel))]
 internal sealed partial class MetadataModeContext : JsonSerializerContext;
 
@@ -80,7 +85,7 @@ public static class Serializers
         var options = new JsonSerializerOptions();
         configureOptions?.Invoke(options);
 
-        options.TypeInfoResolver = BaseResolverFor(configuration).WithExtendedIgnoreConditions(settings);
+        options.TypeInfoResolver = new ExtendedIgnoreConditionResolver(BaseResolverFor(configuration), settings);
 
         return options;
     }
@@ -89,11 +94,10 @@ public static class Serializers
     public static JsonSerializerOptions CreateUnmodified(SerializerConfiguration configuration) =>
         new() { TypeInfoResolver = BaseResolverFor(configuration) };
 
-    private static System.Text.Json.Serialization.Metadata.IJsonTypeInfoResolver BaseResolverFor(
-        SerializerConfiguration configuration) => configuration switch
+    private static IJsonTypeInfoResolver BaseResolverFor(SerializerConfiguration configuration) =>
+        configuration switch
         {
-            SerializerConfiguration.Reflection =>
-                new System.Text.Json.Serialization.Metadata.DefaultJsonTypeInfoResolver(),
+            SerializerConfiguration.Reflection => new DefaultJsonTypeInfoResolver(),
             SerializerConfiguration.SourceGenDefault => DefaultModeContext.Default,
             SerializerConfiguration.SourceGenMetadata => MetadataModeContext.Default,
             _ => throw new ArgumentOutOfRangeException(nameof(configuration)),
