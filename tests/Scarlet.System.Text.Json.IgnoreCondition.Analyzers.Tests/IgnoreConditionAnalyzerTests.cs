@@ -1,0 +1,151 @@
+using Xunit;
+using Verify = Scarlet.System.Text.Json.IgnoreCondition.Analyzers.Tests.Verifiers.CSharpAnalyzerVerifier<Scarlet.System.Text.Json.IgnoreCondition.Analyzers.IgnoreConditionAnalyzer>;
+
+namespace Scarlet.System.Text.Json.IgnoreCondition.Analyzers.Tests;
+
+public sealed class IgnoreConditionAnalyzerTests
+{
+    internal const string Imports = """
+        using System.Text.Json.Serialization;
+        using Scarlet.System.Text.Json.IgnoreCondition;
+
+        """;
+
+    [Theory]
+    [InlineData("WhenReadingNull")]
+    [InlineData("WhenReadingDefault")]
+    public Task Native_WhenReading_conflicts_with_each_extended_rule(string condition) =>
+        Verify.VerifyAsync(Imports + $$"""
+            class Model
+            {
+                [JsonIgnore(Condition = JsonIgnoreCondition.WhenReading)]
+                [{|SJI0001:JsonIgnoreEx(JsonIgnoreConditionEx.{{condition}})|}]
+                public string Value { get; set; }
+            }
+            """);
+
+    [Theory]
+    [InlineData("JsonIgnore")]
+    [InlineData("JsonIgnore(Condition = JsonIgnoreCondition.Always)")]
+    public Task Native_Always_makes_the_extended_rule_ineffective(string native) =>
+        Verify.VerifyAsync(Imports + $$"""
+            class Model
+            {
+                [{{native}}]
+                [{|SJI0002:JsonIgnoreEx(JsonIgnoreConditionEx.WhenReadingNull)|}]
+                public string Value { get; set; }
+            }
+            """);
+
+    /// <summary>
+    /// A bare [JsonIgnoreEx] would read like native [JsonIgnore], so the condition is required. The
+    /// compiler rejects the bare form, and the analyzer adds nothing on top of that error.
+    /// </summary>
+    [Fact]
+    public Task The_extended_attribute_requires_a_condition() =>
+        Verify.VerifyAsync(Imports + """
+            class Model
+            {
+                [JsonIgnore(Condition = JsonIgnoreCondition.WhenReading)]
+                [{|CS7036:JsonIgnoreEx|}]
+                public string Value { get; set; }
+            }
+            """);
+
+    [Theory]
+    [InlineData("Never")]
+    [InlineData("WhenWritingNull")]
+    [InlineData("WhenWritingDefault")]
+    [InlineData("WhenWriting")]
+    public Task Native_write_rules_and_Never_can_be_combined_with_explicit_extended_rules(string condition) =>
+        Verify.VerifyAsync(Imports + $$"""
+            class Model
+            {
+                [JsonIgnore(Condition = JsonIgnoreCondition.{{condition}})]
+                [JsonIgnoreEx(JsonIgnoreConditionEx.WhenReadingDefault)]
+                public string Value { get; set; }
+            }
+            """);
+
+    [Fact]
+    public Task Two_extended_rules_are_rejected_by_the_compiler() =>
+        Verify.VerifyAsync(Imports + """
+            class Model
+            {
+                [JsonIgnoreEx(JsonIgnoreConditionEx.WhenReadingNull)]
+                [{|CS0579:JsonIgnoreEx|}(JsonIgnoreConditionEx.WhenReadingDefault)]
+                public string Value { get; set; }
+            }
+            """);
+
+    [Fact]
+    public Task Aliases_and_constant_expressions_are_resolved_semantically() =>
+        Verify.VerifyAsync(Imports + """
+            using Native = System.Text.Json.Serialization.JsonIgnoreAttribute;
+            using Extended = Scarlet.System.Text.Json.IgnoreCondition.JsonIgnoreExAttribute;
+            class Model
+            {
+                private const JsonIgnoreCondition Condition = JsonIgnoreCondition.WhenReading;
+                [Native(Condition = Condition)]
+                [{|SJI0001:Extended((JsonIgnoreConditionEx)0)|}]
+                public string Value { get; set; }
+            }
+            """);
+
+    [Fact]
+    public Task Record_property_targets_are_analyzed() =>
+        Verify.VerifyAsync(Imports + """
+            public record Model(
+                [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenReading)]
+                [property: {|SJI0001:JsonIgnoreEx(JsonIgnoreConditionEx.WhenReadingNull)|}] string Value);
+            """);
+
+    [Fact]
+    public Task A_multi_variable_field_reports_each_attribute_only_once() =>
+        Verify.VerifyAsync(Imports + """
+            class Model
+            {
+                [JsonIgnore(Condition = JsonIgnoreCondition.WhenReading)]
+                [{|SJI0001:JsonIgnoreEx(JsonIgnoreConditionEx.WhenReadingNull)|}]
+                public string First, Second;
+            }
+            """);
+
+    [Fact]
+    public Task Attributes_with_the_same_short_name_are_ignored() =>
+        Verify.VerifyAsync("""
+            using System;
+            class JsonIgnoreAttribute : Attribute { }
+            class JsonIgnoreExAttribute : Attribute { }
+            class Model
+            {
+                [JsonIgnore, JsonIgnoreEx]
+                public string Value { get; set; }
+            }
+            """);
+
+    [Fact]
+    public Task Generated_code_is_ignored()
+    {
+        var test = new Verify.Test();
+        test.TestState.Sources.Add(("Model.g.cs", "// <auto-generated/>\n" + Imports + """
+            class Model
+            {
+                [JsonIgnore]
+                [JsonIgnoreEx(JsonIgnoreConditionEx.WhenReadingNull)]
+                public string Value { get; set; }
+            }
+            """));
+        return test.RunAsync(TestContext.Current.CancellationToken);
+    }
+
+    [Fact]
+    public Task Ordinary_native_attributes_without_extended_rules_are_ignored() =>
+        Verify.VerifyAsync(Imports + """
+            class Model
+            {
+                [JsonIgnore(Condition = JsonIgnoreCondition.WhenReading)]
+                public string Value { get; set; }
+            }
+            """);
+}

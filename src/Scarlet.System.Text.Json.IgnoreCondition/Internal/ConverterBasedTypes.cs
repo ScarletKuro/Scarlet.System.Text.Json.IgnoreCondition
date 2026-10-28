@@ -19,8 +19,7 @@ namespace Scarlet.System.Text.Json.IgnoreCondition.Internal;
 /// <para>
 /// The classification is deliberately static, not a
 /// <c>JsonSerializerOptions.GetTypeInfo</c> query: the check runs from inside a contract modifier,
-/// where resolving another type's contract can re-enter the resolver. It also lets the analyzer make
-/// the identical judgement at compile time.
+/// where resolving another type's contract can re-enter the resolver.
 /// </para>
 /// </remarks>
 internal static class ConverterBasedTypes

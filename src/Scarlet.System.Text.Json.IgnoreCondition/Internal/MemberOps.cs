@@ -29,7 +29,10 @@ namespace Scarlet.System.Text.Json.IgnoreCondition.Internal;
 /// </remarks>
 internal abstract class MemberOps
 {
+    // Rooted or registered, and therefore available everywhere. Kept apart from instances created on
+    // demand, so that RequireValueTypeRegistration is not satisfied by an earlier JIT-only creation.
     private static readonly ConcurrentDictionary<Type, MemberOps> Known = new();
+    private static readonly ConcurrentDictionary<Type, MemberOps> Created = new();
 
     static MemberOps()
     {
@@ -106,9 +109,10 @@ internal abstract class MemberOps
 
     /// <summary>
     /// Returns the operations for a member type, or <see langword="null"/> when they would require
-    /// runtime generic instantiation that this platform cannot provide.
+    /// runtime generic instantiation that this platform cannot provide, or that
+    /// <paramref name="requireRegistration"/> forbids.
     /// </summary>
-    public static MemberOps? Resolve(Type memberType)
+    public static MemberOps? Resolve(Type memberType, bool requireRegistration)
     {
         if (Known.TryGetValue(memberType, out MemberOps? ops))
         {
@@ -117,12 +121,12 @@ internal abstract class MemberOps
 
         // Reference types share one canonical instantiation, which the static constructor rooted;
         // value types each need their own, which only a JIT can produce on demand.
-        if (memberType.IsValueType && !RuntimeFeature.IsDynamicCodeSupported)
+        if (memberType.IsValueType && (requireRegistration || !RuntimeFeature.IsDynamicCodeSupported))
         {
             return null;
         }
 
-        return Known.GetOrAdd(memberType, CreateUnchecked);
+        return Created.GetOrAdd(memberType, CreateUnchecked);
     }
 
     [UnconditionalSuppressMessage(

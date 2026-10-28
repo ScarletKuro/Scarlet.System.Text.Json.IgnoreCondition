@@ -13,14 +13,14 @@ public sealed class GenericAndIgnoredMemberTests
     {
         JsonSerializerOptions options = Serializers.Create(configuration);
 
-        GenericModel<string> model = JsonSerializer.Deserialize<GenericModel<string>>(
+        GenericModel<string> model = Serializers.Deserialize<GenericModel<string>>(
             """{"Value":null,"Count":null}""",
             options)!;
 
         Assert.Null(model.Value);
         Assert.Equal(5, model.Count);
 
-        GenericModel<string> assigned = JsonSerializer.Deserialize<GenericModel<string>>(
+        GenericModel<string> assigned = Serializers.Deserialize<GenericModel<string>>(
             """{"Value":"x","Count":9}""",
             options)!;
 
@@ -38,12 +38,12 @@ public sealed class GenericAndIgnoredMemberTests
     {
         JsonSerializerOptions options = Serializers.Create(configuration);
 
-        IgnoredMemberModel model = JsonSerializer.Deserialize<IgnoredMemberModel>(
+        IgnoredMemberModel model = Serializers.Deserialize<IgnoredMemberModel>(
             """{"Hidden":"from json","Visible":null}""",
             options)!;
 
         Assert.Equal("initial", model.Hidden);
         Assert.Equal("initial", model.Visible);
-        Assert.DoesNotContain("Hidden", JsonSerializer.Serialize(model, options));
+        Assert.DoesNotContain("Hidden", Serializers.Serialize(model, options));
     }
 }

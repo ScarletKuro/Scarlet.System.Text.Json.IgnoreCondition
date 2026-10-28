@@ -20,7 +20,7 @@ public sealed class StreamingTests
         string json = BuildNestedJson(depth: 12, padding: 4096);
 
         using var stream = new MemoryStream(Encoding.UTF8.GetBytes(json));
-        NestedModel model = (await JsonSerializer.DeserializeAsync<NestedModel>(
+        NestedModel model = (await Serializers.DeserializeAsync<NestedModel>(
             stream,
             new JsonSerializerOptions(options) { DefaultBufferSize = 16 },
             TestContext.Current.CancellationToken))!;
@@ -34,7 +34,7 @@ public sealed class StreamingTests
     {
         JsonSerializerOptions options = Serializers.Create(configuration);
 
-        NestedModel model = JsonSerializer.Deserialize<NestedModel>(
+        NestedModel model = Serializers.Deserialize<NestedModel>(
             BuildNestedJson(depth: 12, padding: 4096),
             options)!;
 
@@ -53,13 +53,13 @@ public sealed class StreamingTests
         {
             if (index % 2 == 0)
             {
-                NestedModel model = JsonSerializer.Deserialize<NestedModel>(skipped, options)!;
+                NestedModel model = Serializers.Deserialize<NestedModel>(skipped, options)!;
                 Assert.Equal("initial", model.Name);
                 Assert.Equal(41, model.Age);
             }
             else
             {
-                NestedModel model = JsonSerializer.Deserialize<NestedModel>(assigned, options)!;
+                NestedModel model = Serializers.Deserialize<NestedModel>(assigned, options)!;
                 Assert.Equal("given", model.Name);
                 Assert.Equal(9, model.Age);
             }
@@ -76,11 +76,11 @@ public sealed class StreamingTests
     {
         JsonSerializerOptions options = Serializers.Create(configuration);
 
-        ValueModel nullFirst = JsonSerializer.Deserialize<ValueModel>("""{"Age":null,"Amount":3.5}""", options)!;
+        ValueModel nullFirst = Serializers.Deserialize<ValueModel>("""{"Age":null,"Amount":3.5}""", options)!;
         Assert.Equal(41, nullFirst.Age);
         Assert.Equal(3.5m, nullFirst.Amount);
 
-        ValueModel nullSecond = JsonSerializer.Deserialize<ValueModel>("""{"Amount":3.5,"Age":null}""", options)!;
+        ValueModel nullSecond = Serializers.Deserialize<ValueModel>("""{"Amount":3.5,"Age":null}""", options)!;
         Assert.Equal(41, nullSecond.Age);
         Assert.Equal(3.5m, nullSecond.Amount);
     }
@@ -91,8 +91,8 @@ public sealed class StreamingTests
     {
         JsonSerializerOptions options = Serializers.Create(configuration);
 
-        Assert.Equal(5, JsonSerializer.Deserialize<ValueModel>("""{"Age":null,"Age":5}""", options)!.Age);
-        Assert.Equal(5, JsonSerializer.Deserialize<ValueModel>("""{"Age":5,"Age":null}""", options)!.Age);
+        Assert.Equal(5, Serializers.Deserialize<ValueModel>("""{"Age":null,"Age":5}""", options)!.Age);
+        Assert.Equal(5, Serializers.Deserialize<ValueModel>("""{"Age":5,"Age":null}""", options)!.Age);
     }
 
     private static string BuildNestedJson(int depth, int padding)

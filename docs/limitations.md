@@ -24,7 +24,10 @@ applicable options-level default is not touched at all, so it keeps its fast pat
 | `[JsonExtensionData]` | Extension data is not a normal member. |
 | Also carries `[JsonIgnore]` | `[JsonIgnore]` wins. The serializer keeps the contract entry but strips both accessors, so the extended condition has nothing to act on and is skipped rather than reported. |
 
-Two conditions on the same side (two read-side, or two write-side) also throws.
+Native `[JsonIgnore(Condition = JsonIgnoreCondition.WhenReading)]` conflicts with an explicit
+`JsonIgnoreEx` and throws a `NotSupportedException` naming both rules, even with
+`UnsupportedMemberBehavior.Skip`. Native `Always` wins; the extended attribute is ineffective. The
+bundled analyzer reports these combinations. Applying `JsonIgnoreEx` twice is a compiler error.
 
 ## Constructor parameters
 
@@ -38,7 +41,6 @@ path never calls a setter. Consequences:
   ability to resume a partially buffered read. The library refuses instead of being quietly wrong.
 - **Non-default `JsonNumberHandling` on a numeric parameter is refused**: the number-handling logic lives
   in the serializer's internal converters, and a member-level converter override does not inherit it.
-- `Always` and `WhenReading` are refused outright: the constructor argument has to be supplied.
 - A parameter with no default falls back to `default(T)`, since there is no other value to substitute.
 
 Settable properties have none of these restrictions. Their non-nullable value types are handled by
@@ -52,6 +54,18 @@ work.
 `[property: JsonIgnoreEx(...)]`. Without the target the compiler rejects it, rather than the attribute
 landing on the parameter where the contract would never see it.
 
+## Overriding a property drops its attribute
+
+`[JsonIgnoreEx]` on a `virtual` property does not carry over to an `override` that does not repeat it.
+Attribute lookup on a property does not walk the inheritance chain; native `[JsonIgnore]` and
+`[JsonPropertyName]` behave the same way. A property that is inherited without being overridden keeps
+its attribute.
+
+## `WhenReadingDefault` uses the declared type's default
+
+The comparison is against `default` of the member's own type. For `int` that is `0`; for `int?` it is
+`null`, so an incoming `0` is assigned. Declare the member as `int` if `0` should also be skipped.
+
 ## Explicit nulls are skipped, not rejected
 
 `WhenReadingNull` on a non-nullable value type turns a JSON `null` from an error into a silent skip. If
@@ -59,10 +73,11 @@ you want the error, that is the built-in behaviour — leave the member unannota
 
 ## NativeAOT and trimming
 
-The source-generated path is AOT- and trim-clean. `tests/…AotSample` publishes with
-`PublishAot`/`PublishTrimmed`, `TrimmerSingleWarn=false` and
-`JsonSerializerIsReflectionEnabledByDefault=false` to keep it that way, and asserts the behaviour at run
-time.
+The source-generated path is AOT- and trim-clean. The xUnit test project publishes with
+`-p:NativeAotTests=true`, enabling `PublishAot`/`PublishTrimmed`, `TrimmerSingleWarn=false` and
+`JsonSerializerIsReflectionEnabledByDefault=false`. Trim and AOT warnings are errors. The published
+binary runs the shared behavioral tests against both generated resolver modes and verifies that
+dynamic code and serializer reflection are disabled. Reflection-only tests run in the managed build.
 
 Two things to know:
 
@@ -73,6 +88,19 @@ Two things to know:
   `TimeOnly`, `TimeSpan`, and each of their `Nullable<T>` forms), which costs about 44 rooted
   instantiations of binary size in exchange for needing no registration in the common cases. Reference
   types share one canonical instantiation and never need registering.
+- **The generator only sees `[JsonIgnoreEx]`.** It registers the custom value types of annotated members,
+  including `[property:]` targets on positional records, from a module initializer in the assembly that
+  declares them; the resolver runs that initializer before it looks a type up, because resolving a
+  contract alone does not. It cannot see members reached only by `DefaultReadCondition`, members typed
+  as a generic type parameter, types inaccessible from generated code (such as a `private` nested enum),
+  or projects compiled below C# 9. Register those manually.
+  `ExtendedIgnoreConditionSettings.RequireValueTypeRegistration = true` makes JIT runs refuse them as a
+  native build would.
+- **A missing registration is reported even for `DefaultReadCondition`.** Other members an options-level
+  default cannot apply to are skipped silently, but an unregistered value type is a setup mistake that
+  only exists under NativeAOT. Skipping it would let the same model skip nulls under JIT and throw on them
+  after publishing, so the resolver throws instead, unless
+  `UnsupportedMemberBehavior.Skip` is set.
 - **The parameterless `ExtendedIgnoreConditionResolver()` constructor is not AOT-safe** — it falls back to
   `DefaultJsonTypeInfoResolver`, and is annotated `[RequiresUnreferencedCode]`/`[RequiresDynamicCode]`
   accordingly. Pass a source-generated context instead.
@@ -109,5 +137,4 @@ var x = JsonSerializer.Deserialize<Config>(json, options);
 - Generic model types are supported, but each closed instantiation resolves its own contract, and a
   member whose type is a type parameter bound to a custom value type needs that value type registered as
   above.
-- Type-level or assembly-level defaults beyond the options-level `DefaultReadCondition` /
-  `DefaultWriteCondition`.
+- Type-level or assembly-level defaults beyond the options-level `DefaultReadCondition`.

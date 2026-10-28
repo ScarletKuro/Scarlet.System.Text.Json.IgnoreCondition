@@ -1,0 +1,44 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Validate (${{ matrix.rid }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            rid: win-x64
+            extension: .exe
+          - os: ubuntu-latest
+            rid: linux-x64
+            extension: ''
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '10.0.x'
+      - name: Build solution
+        run: dotnet build -c Release
+      - name: Run tests
+        run: dotnet test --project tests/Scarlet.System.Text.Json.IgnoreCondition.Tests -c Release --no-build
+      - name: Run analyzer and code fix tests
+        run: dotnet test --project tests/Scarlet.System.Text.Json.IgnoreCondition.Analyzers.Tests -c Release --no-build
+      - name: Pack
+        run: dotnet pack src/Scarlet.System.Text.Json.IgnoreCondition -c Release --no-build -o artifacts/packages
+      - name: Publish NativeAOT tests
+        run: dotnet publish tests/Scarlet.System.Text.Json.IgnoreCondition.Tests -c Release -r ${{ matrix.rid }} -p:NativeAotTests=true -o artifacts/aot
+      - name: Run NativeAOT tests
+        run: '& "./artifacts/aot/Scarlet.System.Text.Json.IgnoreCondition.Tests${{ matrix.extension }}"'

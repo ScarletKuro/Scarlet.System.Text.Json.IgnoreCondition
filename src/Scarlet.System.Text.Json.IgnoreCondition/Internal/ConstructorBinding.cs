@@ -37,14 +37,22 @@ internal readonly struct ConstructorBinding
 
     /// <summary>
     /// Finds the constructor parameter a member is bound to. Mirrors the serializer's own matching:
-    /// by name, case-insensitively, with the parameter type equal to the member type.
+    /// by the CLR member name (the JSON name only when there is none), case-insensitively, with the
+    /// parameter type equal to the member type.
     /// </summary>
+    /// <remarks>
+    /// Matching the JSON name as well would be wrong, not merely generous: a settable member renamed
+    /// to a parameter's name would be treated as constructor-bound, and the substituted default would
+    /// then be assigned through its setter, overwriting the initializer the condition exists to keep.
+    /// </remarks>
     public bool TryGetParameter(
         string? memberName,
         string jsonName,
         Type memberType,
         [NotNullWhen(true)] out ParameterInfo? parameter)
     {
+        string lookupName = memberName ?? jsonName;
+
         if (_parameters is { } parameters)
         {
             foreach (ParameterInfo candidate in parameters)
@@ -54,8 +62,7 @@ internal readonly struct ConstructorBinding
                     continue;
                 }
 
-                if (string.Equals(name, memberName, StringComparison.OrdinalIgnoreCase) ||
-                    string.Equals(name, jsonName, StringComparison.OrdinalIgnoreCase))
+                if (string.Equals(name, lookupName, StringComparison.OrdinalIgnoreCase))
                 {
                     parameter = candidate;
                     return true;

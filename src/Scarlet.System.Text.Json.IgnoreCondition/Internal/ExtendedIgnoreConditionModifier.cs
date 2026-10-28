@@ -1,4 +1,5 @@
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.Json.Serialization.Metadata;
@@ -28,7 +29,7 @@ namespace Scarlet.System.Text.Json.IgnoreCondition.Internal;
 /// </item>
 /// </list>
 /// </remarks>
-internal sealed class ExtendedIgnoreConditionModifier(ExtendedIgnoreConditionSettings settings)
+internal sealed class ExtendedIgnoreConditionModifier
 {
     private static readonly HashSet<Type> NumericTypes =
     [
@@ -36,6 +37,19 @@ internal sealed class ExtendedIgnoreConditionModifier(ExtendedIgnoreConditionSet
         typeof(long), typeof(ulong), typeof(float), typeof(double), typeof(decimal),
         typeof(Half), typeof(Int128), typeof(UInt128),
     ];
+
+    // Copied rather than referenced: contracts are resolved lazily and cached, so a settings object
+    // mutated afterwards would apply to some types and not others.
+    private readonly JsonIgnoreConditionEx? _defaultReadCondition;
+    private readonly UnsupportedMemberBehavior _unsupportedMemberBehavior;
+    private readonly bool _requireValueTypeRegistration;
+
+    public ExtendedIgnoreConditionModifier(ExtendedIgnoreConditionSettings settings)
+    {
+        _defaultReadCondition = settings.DefaultReadCondition;
+        _unsupportedMemberBehavior = settings.UnsupportedMemberBehavior;
+        _requireValueTypeRegistration = settings.RequireValueTypeRegistration;
+    }
 
     public void Modify(JsonTypeInfo typeInfo)
     {
@@ -62,148 +76,39 @@ internal sealed class ExtendedIgnoreConditionModifier(ExtendedIgnoreConditionSet
                 continue;
             }
 
-            MemberConditions conditions = ReadConditions(property);
-            if (conditions.IsEmpty)
+            MemberCondition conditions = ReadCondition(property);
+            if (conditions.Read is null)
             {
                 continue;
             }
 
             constructorBinding ??= ConstructorBinding.Create(typeInfo);
-            Apply(typeInfo, index, property, conditions, constructorBinding.Value);
+            ApplyRead(typeInfo, index, property, conditions.Read.Value, conditions.IsExplicit, constructorBinding.Value);
         }
     }
 
-    /// <summary>
-    /// Folds the member's attributes, and any options-level default, into one read-side and one
-    /// write-side condition.
-    /// </summary>
-    private MemberConditions ReadConditions(JsonPropertyInfo property)
+    private MemberCondition ReadCondition(JsonPropertyInfo property)
     {
         JsonIgnoreConditionEx? read = null;
-        JsonIgnoreConditionEx? write = null;
-        bool always = false;
-        bool suppressDefaults = false;
-
         if (property.AttributeProvider?.GetCustomAttributes(typeof(JsonIgnoreExAttribute), inherit: true)
             is { Length: > 0 } attributes)
-        {
-            foreach (object attribute in attributes)
-            {
-                JsonIgnoreConditionEx condition = ((JsonIgnoreExAttribute)attribute).Condition;
+            read = ((JsonIgnoreExAttribute)attributes[0]).Condition;
 
-                if (condition == JsonIgnoreConditionEx.Always)
-                {
-                    always = true;
-                }
-                else if (condition == JsonIgnoreConditionEx.Never)
-                {
-                    suppressDefaults = true;
-                }
-                else if (ConditionKinds.IsReadSide(condition))
-                {
-                    ThrowIfConflicting(property, read, condition, "read");
-                    read = condition;
-                }
-                else
-                {
-                    ThrowIfConflicting(property, write, condition, "write");
-                    write = condition;
-                }
-            }
+        bool isExplicit = read is not null;
+        if (property.AttributeProvider?.GetCustomAttributes(typeof(JsonIgnoreAttribute), inherit: true)
+            is { Length: > 0 } nativeAttributes)
+        {
+            var native = ((JsonIgnoreAttribute)nativeAttributes[0]).Condition;
+            if (isExplicit && IgnoreConditionRules.NativeConflictsWithExtended((int)native))
+                throw new NotSupportedException(
+                    $"'{property.DeclaringType}.{MemberNameOf(property) ?? property.Name}' declares conflicting " +
+                    $"read-side ignore conditions: native '{native}' and extended '{read}'.");
+
+            if (!isExplicit && IgnoreConditionRules.NativeSuppressesReadDefault((int)native))
+                return default;
         }
 
-        bool readIsExplicit = read is not null;
-        bool writeIsExplicit = write is not null;
-
-        if (!suppressDefaults)
-        {
-            read ??= settings.DefaultReadCondition;
-            write ??= settings.DefaultWriteCondition;
-        }
-
-        return new MemberConditions(
-            Read: read == JsonIgnoreConditionEx.Never ? null : read,
-            Write: write == JsonIgnoreConditionEx.Never ? null : write,
-            Always: always,
-            ReadIsExplicit: readIsExplicit,
-            WriteIsExplicit: writeIsExplicit);
-    }
-
-    private static void ThrowIfConflicting(
-        JsonPropertyInfo property,
-        JsonIgnoreConditionEx? existing,
-        JsonIgnoreConditionEx incoming,
-        string side)
-    {
-        if (existing is { } already && already != incoming)
-        {
-            throw new NotSupportedException(
-                $"'{property.DeclaringType}.{MemberNameOf(property) ?? property.Name}' declares two " +
-                $"conflicting {side}-side ignore conditions: '{already}' and '{incoming}'.");
-        }
-    }
-
-    private void Apply(
-        JsonTypeInfo typeInfo,
-        int index,
-        JsonPropertyInfo property,
-        MemberConditions conditions,
-        ConstructorBinding constructorBinding)
-    {
-        if (conditions.Always)
-        {
-            if (constructorBinding.TryGetParameter(MemberNameOf(property), property.Name, property.PropertyType, out _))
-            {
-                Refuse(
-                    isExplicit: true,
-                    typeInfo,
-                    property,
-                    "it is bound to a deserialization constructor parameter, which the serializer " +
-                    "always has to supply a value for. Remove the parameter or use WhenWriting.");
-                return;
-            }
-
-            typeInfo.Properties.RemoveAt(index);
-            return;
-        }
-
-        if (conditions.Write is { } writeCondition)
-        {
-            ApplyWrite(typeInfo, property, writeCondition, conditions.WriteIsExplicit);
-        }
-
-        if (conditions.Read is { } readCondition)
-        {
-            ApplyRead(typeInfo, index, property, readCondition, conditions.ReadIsExplicit, constructorBinding);
-        }
-    }
-
-    private void ApplyWrite(
-        JsonTypeInfo typeInfo,
-        JsonPropertyInfo property,
-        JsonIgnoreConditionEx condition,
-        bool isExplicit)
-    {
-        switch (condition)
-        {
-            case JsonIgnoreConditionEx.WhenWriting:
-                property.ShouldSerialize = static (_, _) => false;
-                break;
-
-            case JsonIgnoreConditionEx.WhenWritingNull:
-                property.ShouldSerialize = static (_, value) => value is not null;
-                break;
-
-            case JsonIgnoreConditionEx.WhenWritingDefault:
-                if (MemberOps.Resolve(property.PropertyType) is not { } ops)
-                {
-                    Refuse(isExplicit, typeInfo, property, MissingOpsReason(property.PropertyType));
-                    return;
-                }
-
-                property.ShouldSerialize = (_, value) => !ops.IsDefaultValue(value);
-                break;
-        }
+        return new MemberCondition(read ?? _defaultReadCondition, isExplicit);
     }
 
     private void ApplyRead(
@@ -238,24 +143,6 @@ internal sealed class ExtendedIgnoreConditionModifier(ExtendedIgnoreConditionSet
             memberType,
             out ParameterInfo? parameter);
 
-        if (condition == JsonIgnoreConditionEx.WhenReading)
-        {
-            if (isConstructorBound)
-            {
-                Refuse(
-                    isExplicit,
-                    typeInfo,
-                    property,
-                    "it is bound to a deserialization constructor parameter, which the serializer " +
-                    "always has to supply a value for.");
-                return;
-            }
-
-            // A property with no setter is skipped over by the serializer.
-            property.Set = null;
-            return;
-        }
-
         // WhenReadingDefault always needs the typed default comparison; WhenReadingNull only needs
         // typed metadata to reach a constructor parameter or to project a value type as T?.
         bool needsTypedOps = condition == JsonIgnoreConditionEx.WhenReadingDefault ||
@@ -265,10 +152,19 @@ internal sealed class ExtendedIgnoreConditionModifier(ExtendedIgnoreConditionSet
         MemberOps? ops = null;
         if (needsTypedOps)
         {
-            ops = MemberOps.Resolve(memberType);
+            // The source generator registers value types from a module initializer in the assembly
+            // that declares the annotated member. Resolving a contract only reflects over that
+            // assembly, which does not run its initializer, so run it before looking the type up.
+            RuntimeHelpers.RunModuleConstructor(property.DeclaringType.Module.ModuleHandle);
+
+            ops = MemberOps.Resolve(memberType, _requireValueTypeRegistration);
             if (ops is null)
             {
-                Refuse(isExplicit, typeInfo, property, MissingOpsReason(memberType));
+                // Unlike the other refusals this is a setup mistake, not a member the condition cannot
+                // apply to, and it only happens under NativeAOT or RequireValueTypeRegistration.
+                // Skipping it silently for an options-level default would make NativeAOT quietly
+                // diverge from JIT, so it is reported whether or not the condition is explicit.
+                Refuse(isExplicit: true, typeInfo, property, MissingOpsReason(memberType));
                 return;
             }
         }
@@ -329,6 +225,14 @@ internal sealed class ExtendedIgnoreConditionModifier(ExtendedIgnoreConditionSet
         else
         {
             property.Set = CreateSkippingSetter(property.Set!, ops, condition);
+
+            // The wrapper discards null before it reaches the model. Let it receive that null even
+            // when RespectNullableAnnotations validates the original non-nullable reference member.
+            // Keep IsGetNullable unchanged so serialization still enforces the declared annotation.
+            if (!memberType.IsValueType)
+            {
+                property.IsSetNullable = true;
+            }
         }
     }
 
@@ -349,6 +253,14 @@ internal sealed class ExtendedIgnoreConditionModifier(ExtendedIgnoreConditionSet
         projection.Order = property.Order;
         projection.ObjectCreationHandling = property.ObjectCreationHandling;
         projection.ShouldSerialize = property.ShouldSerialize;
+        if (projection.ShouldSerialize is null &&
+            typeInfo.Options.DefaultIgnoreCondition == JsonIgnoreCondition.WhenWritingDefault)
+        {
+            // T? has a different default from T: boxed zero/false/default(struct) is non-null.
+            // Preserve the original comparison when the options supply the write condition. An
+            // existing predicate (including [JsonIgnore(Never)]) already overrides that default.
+            projection.ShouldSerialize = (_, value) => !ops.IsDefaultValue(value);
+        }
         projection.AttributeProvider = property.AttributeProvider;
         projection.IsGetNullable = true;
         projection.IsSetNullable = true;
@@ -382,10 +294,19 @@ internal sealed class ExtendedIgnoreConditionModifier(ExtendedIgnoreConditionSet
         };
     }
 
-    private static string MissingOpsReason(Type memberType) =>
-        $"'{memberType}' is a value type whose metadata this platform cannot produce at run time. " +
-        $"Call ExtendedIgnoreConditionResolver.RegisterValueType<{memberType.Name}>() during startup " +
-        "to make it available.";
+    private static string MissingOpsReason(Type memberType)
+    {
+        Type valueType = Nullable.GetUnderlyingType(memberType) ?? memberType;
+        return $"'{valueType}' is a custom value type that has not been registered, and NativeAOT " +
+               "cannot create its metadata at run time. Call " +
+               $"ExtendedIgnoreConditionResolver.RegisterValueType<{CSharpName(valueType)}>() during startup.";
+    }
+
+    private static string CSharpName(Type type) =>
+        type.IsGenericType
+            ? $"{type.Name[..type.Name.IndexOf('`', StringComparison.Ordinal)]}<" +
+              $"{string.Join(", ", type.GetGenericArguments().Select(CSharpName))}>"
+            : type.Name;
 
     private static bool IsNonNullableValueType(Type type) =>
         type.IsValueType && Nullable.GetUnderlyingType(type) is null;
@@ -406,7 +327,7 @@ internal sealed class ExtendedIgnoreConditionModifier(ExtendedIgnoreConditionSet
     {
         // A condition that came from an attribute is reported when it cannot be applied; one inherited
         // from an options-level default is best-effort, because it is aimed at every member at once.
-        if (!isExplicit || settings.UnsupportedMemberBehavior == UnsupportedMemberBehavior.Skip)
+        if (!isExplicit || _unsupportedMemberBehavior == UnsupportedMemberBehavior.Skip)
         {
             return;
         }
@@ -419,13 +340,5 @@ internal sealed class ExtendedIgnoreConditionModifier(ExtendedIgnoreConditionSet
     private static string? MemberNameOf(JsonPropertyInfo property) =>
         (property.AttributeProvider as MemberInfo)?.Name;
 
-    private readonly record struct MemberConditions(
-        JsonIgnoreConditionEx? Read,
-        JsonIgnoreConditionEx? Write,
-        bool Always,
-        bool ReadIsExplicit,
-        bool WriteIsExplicit)
-    {
-        public bool IsEmpty => !Always && Read is null && Write is null;
-    }
+    private readonly record struct MemberCondition(JsonIgnoreConditionEx? Read, bool IsExplicit);
 }

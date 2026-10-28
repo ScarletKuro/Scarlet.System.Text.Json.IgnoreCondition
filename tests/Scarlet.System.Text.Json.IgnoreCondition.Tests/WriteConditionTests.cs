@@ -65,8 +65,8 @@ public sealed class WriteConditionTests
     }
 
     private static T Deserialize<T>(string json, JsonSerializerOptions options) =>
-        JsonSerializer.Deserialize<T>(json, options)!;
+        Serializers.Deserialize<T>(json, options)!;
 
     private static string Serialize<T>(T value, JsonSerializerOptions options) =>
-        JsonSerializer.Serialize(value, options);
+        Serializers.Serialize(value, options);
 }

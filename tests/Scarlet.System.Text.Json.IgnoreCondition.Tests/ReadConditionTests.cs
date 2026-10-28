@@ -11,7 +11,9 @@ public sealed class ReadConditionTests
 {
     public static TheoryData<SerializerConfiguration> Configurations =>
     [
+#if !NATIVE_AOT_TESTS
         SerializerConfiguration.Reflection,
+#endif
         SerializerConfiguration.SourceGenDefault,
         SerializerConfiguration.SourceGenMetadata,
     ];
@@ -224,6 +226,16 @@ public sealed class ReadConditionTests
 
     [Theory]
     [MemberData(nameof(Configurations))]
+    public void WhenReadingDefault_on_a_nullable_value_type_skips_only_null(SerializerConfiguration configuration)
+    {
+        JsonSerializerOptions options = Serializers.Create(configuration);
+
+        Assert.Equal(7, Deserialize<ReadingDefaultModel>("""{"Optional":null}""", options).Optional);
+        Assert.Equal(0, Deserialize<ReadingDefaultModel>("""{"Optional":0}""", options).Optional);
+    }
+
+    [Theory]
+    [MemberData(nameof(Configurations))]
     public void Read_and_write_conditions_combine_on_one_member(SerializerConfiguration configuration)
     {
         JsonSerializerOptions options = Serializers.Create(configuration);
@@ -268,8 +280,8 @@ public sealed class ReadConditionTests
     }
 
     private static T Deserialize<T>(string json, JsonSerializerOptions options) =>
-        JsonSerializer.Deserialize<T>(json, options)!;
+        Serializers.Deserialize<T>(json, options)!;
 
     private static string Serialize<T>(T value, JsonSerializerOptions options) =>
-        JsonSerializer.Serialize(value, options);
+        Serializers.Serialize(value, options);
 }

@@ -87,25 +87,42 @@ public sealed record RecordModel(
     [property: JsonIgnoreEx(JsonIgnoreConditionEx.WhenReadingNull)] int Age = 41,
     [property: JsonIgnoreEx(JsonIgnoreConditionEx.WhenReadingNull)] string? Nickname = null);
 
+/// <summary>
+/// A settable member whose JSON name equals a constructor parameter name. The serializer binds that
+/// parameter by CLR name to <see cref="Title"/>, so <see cref="Subtitle"/> must go through its setter.
+/// </summary>
+public sealed class JsonNameCollisionModel
+{
+    [JsonConstructor]
+    public JsonNameCollisionModel(string title) => Title = title;
+
+    [JsonPropertyName("heading")]
+    public string Title { get; }
+
+    [JsonPropertyName("title")]
+    [JsonIgnoreEx(JsonIgnoreConditionEx.WhenReadingNull)]
+    public string? Subtitle { get; set; } = "initial";
+}
+
 /// <summary>A constructor parameter with no default, which can only fall back to the type default.</summary>
 public sealed record RequiredParameterRecordModel(
     [property: JsonIgnoreEx(JsonIgnoreConditionEx.WhenReadingNull)] string Name);
 
 public sealed class WriteModel
 {
-    [JsonIgnoreEx(JsonIgnoreConditionEx.WhenWritingNull)]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? WhenWritingNull { get; set; }
 
-    [JsonIgnoreEx(JsonIgnoreConditionEx.WhenWritingDefault)]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
     public int WhenWritingDefault { get; set; }
 
-    [JsonIgnoreEx(JsonIgnoreConditionEx.WhenWriting)]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWriting)]
     public string WhenWriting { get; set; } = "written";
 
-    [JsonIgnoreEx(JsonIgnoreConditionEx.WhenReading)]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenReading)]
     public string WhenReading { get; set; } = "read";
 
-    [JsonIgnoreEx(JsonIgnoreConditionEx.Always)]
+    [JsonIgnore(Condition = JsonIgnoreCondition.Always)]
     public string Always { get; set; } = "always";
 
     public string Kept { get; set; } = "kept";
@@ -115,8 +132,43 @@ public sealed class WriteModel
 public sealed class CombinedModel
 {
     [JsonIgnoreEx(JsonIgnoreConditionEx.WhenReadingNull)]
-    [JsonIgnoreEx(JsonIgnoreConditionEx.WhenWritingNull)]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? Name { get; set; } = "initial";
+}
+
+/// <summary>Read conditions must preserve the original value type's write defaults.</summary>
+public sealed class ProjectedWriteDefaultsModel
+{
+    [JsonIgnoreEx(JsonIgnoreConditionEx.WhenReadingNull)]
+    public int Count { get; set; }
+
+    [JsonIgnoreEx(JsonIgnoreConditionEx.WhenReadingDefault)]
+    public bool Enabled { get; set; }
+
+    [JsonIgnoreEx(JsonIgnoreConditionEx.WhenReadingNull)]
+    public Guid Id { get; set; }
+
+    [JsonIgnoreEx(JsonIgnoreConditionEx.WhenReadingNull)]
+    public int? Optional { get; set; } = 0;
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.Never)]
+    [JsonIgnoreEx(JsonIgnoreConditionEx.WhenReadingNull)]
+    public int AlwaysWritten { get; set; }
+}
+
+public sealed class NonNullableReferenceModel
+{
+    [JsonIgnoreEx(JsonIgnoreConditionEx.WhenReadingNull)]
+    public string Name { get; set; } = "initial";
+
+    [JsonIgnoreEx(JsonIgnoreConditionEx.WhenReadingDefault)]
+    public List<string> Values { get; set; } = ["initial"];
+
+    [JsonInclude]
+    [JsonIgnoreEx(JsonIgnoreConditionEx.WhenReadingNull)]
+    public string Field = "initial";
+
+    public string Untouched { get; set; } = "initial";
 }
 
 public sealed class ReadingDefaultModel
@@ -126,6 +178,50 @@ public sealed class ReadingDefaultModel
 
     [JsonIgnoreEx(JsonIgnoreConditionEx.WhenReadingDefault)]
     public int Age { get; set; } = 41;
+
+    /// <summary>The default of <c>int?</c> is null, so an incoming 0 is assigned.</summary>
+    [JsonIgnoreEx(JsonIgnoreConditionEx.WhenReadingDefault)]
+    public int? Optional { get; set; } = 7;
+}
+
+public sealed class MixedConditionModel
+{
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    [JsonIgnoreEx(JsonIgnoreConditionEx.WhenReadingNull)]
+    public string? Name { get; set; } = "initial";
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    [JsonIgnoreEx(JsonIgnoreConditionEx.WhenReadingNull)]
+    public int Count { get; set; } = 7;
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenReading)]
+    public string? ReadIgnored { get; set; } = "initial";
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.Never)]
+    [JsonIgnoreEx(JsonIgnoreConditionEx.WhenReadingNull)]
+    public int AlwaysWritten { get; set; } = 9;
+
+
+}
+
+public sealed class NativePrecedenceModel
+{
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWriting)]
+    public string? NeverWritten { get; set; } = "initial";
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenReading)]
+    public string? NeverRead { get; set; } = "initial";
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public int Count { get; set; }
+}
+
+
+public sealed class ConflictingNativeReadModel
+{
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenReading)]
+    [JsonIgnoreEx(JsonIgnoreConditionEx.WhenReadingNull)]
+    public string? Value { get; set; }
 }
 
 /// <summary>Carries no attributes; used to exercise the options-level defaults.</summary>
@@ -137,9 +233,36 @@ public sealed class OptionsDefaultModel
 
     public int? Optional { get; set; } = 7;
 
-    [JsonIgnoreEx(JsonIgnoreConditionEx.Never)]
+    [JsonIgnore(Condition = JsonIgnoreCondition.Never)]
     public string? OptedOut { get; set; } = "initial";
 }
+
+/// <summary>
+/// Compares the obsolete <c>IgnoreNullValues</c> with its replacement: one member of each shape the two
+/// treat differently on the read side.
+/// </summary>
+public sealed class IgnoreNullValuesModel
+{
+    public string? Name { get; set; } = "initial";
+
+    public List<string> Values { get; set; } = ["a"];
+
+    public int? Optional { get; set; } = 7;
+
+    public int Count { get; set; } = 3;
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.Never)]
+    public string? OptedOut { get; set; } = "initial";
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? WriteConditioned { get; set; } = "initial";
+
+    [JsonIgnoreEx(JsonIgnoreConditionEx.WhenReadingNull)]
+    public int Annotated { get; set; } = 5;
+}
+
+/// <summary>Unannotated constructor parameters, for the same comparison.</summary>
+public sealed record IgnoreNullValuesRecord(string? Name = "unknown", int Age = 41);
 
 /// <summary>A nested graph, large enough to force read continuations when streamed.</summary>
 public sealed class NestedModel
@@ -248,6 +371,31 @@ public enum Priority
     Low,
     Normal,
     High,
+}
+
+/// <summary>A user enum that is deliberately never registered, not even for the NativeAOT run.</summary>
+public enum Shade
+{
+    Light,
+    Dark,
+}
+
+/// <summary>Carries no attributes; reached only by an options-level default.</summary>
+public sealed class UnregisteredValueTypeModel
+{
+    public Shade Shade { get; set; } = Shade.Dark;
+}
+
+/// <summary>The same unregistered type behind <see cref="Nullable{T}"/>.</summary>
+public sealed class UnregisteredNullableValueTypeModel
+{
+    public Shade? Tint { get; set; } = Shade.Dark;
+}
+
+/// <summary>Used by no model, so only an explicit RegisterValueType call can register it.</summary>
+public enum ManualOnly
+{
+    A,
 }
 
 public sealed class CustomValueTypeModel

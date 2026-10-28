@@ -2,49 +2,36 @@ using System.Text.Json.Serialization;
 
 namespace Scarlet.System.Text.Json.IgnoreCondition;
 
-/// <summary>
-/// Prevents a property or field from being serialized or deserialized under the specified condition,
-/// including the read-side conditions that the built-in
-/// <see cref="global::System.Text.Json.Serialization.JsonIgnoreAttribute"/> cannot express.
-/// </summary>
+/// <summary>Skips null or default values when deserializing a property or field.</summary>
 /// <remarks>
+/// Set <see cref="ExtendedIgnoreConditionResolver"/> as the serializer's resolver to enable this attribute.
+/// Combine it with native <see cref="JsonIgnoreAttribute"/> write conditions. Native Always makes it
+/// ineffective; native WhenReading conflicts with it. On positional records, use the property: target.
 /// <para>
-/// The attribute only takes effect once <see cref="ExtendedIgnoreConditionResolver"/> has been set as
-/// the <see cref="global::System.Text.Json.JsonSerializerOptions.TypeInfoResolver"/>.
-/// </para>
-/// <para>
-/// The attribute may be applied twice to combine one read-side condition with one write-side
-/// condition. Two conditions on the same side throws.
-/// </para>
-/// <para>
-/// On a positional record parameter, target the generated property explicitly with
-/// <c>[property: JsonIgnoreEx(...)]</c>: an attribute on the parameter itself would belong to the
-/// parameter, which the contract never surfaces.
+/// The condition is deliberately required. A bare <c>[JsonIgnoreEx]</c> would read like the native
+/// <c>[JsonIgnore]</c>, which excludes the member entirely, while this attribute only filters what is read.
 /// </para>
 /// </remarks>
 /// <example>
 /// <code>
 /// [JsonIgnoreEx(JsonIgnoreConditionEx.WhenReadingNull)]
-/// [JsonIgnoreEx(JsonIgnoreConditionEx.WhenWritingNull)]
+/// [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
 /// public string? Name { get; set; } = "initial";
 /// </code>
 /// </example>
-[AttributeUsage(AttributeTargets.Property | AttributeTargets.Field, AllowMultiple = true)]
+[AttributeUsage(AttributeTargets.Property | AttributeTargets.Field, AllowMultiple = false)]
 public sealed class JsonIgnoreExAttribute : JsonAttribute
 {
-    /// <summary>
-    /// Initializes a new instance whose <see cref="Condition"/> is
-    /// <see cref="JsonIgnoreConditionEx.Always"/>.
-    /// </summary>
-    public JsonIgnoreExAttribute()
-        : this(JsonIgnoreConditionEx.Always)
+    /// <summary>Initializes the attribute with one of the extended read conditions.</summary>
+    /// <param name="condition">The read condition.</param>
+    /// <exception cref="ArgumentOutOfRangeException">The condition is not defined.</exception>
+    public JsonIgnoreExAttribute(JsonIgnoreConditionEx condition)
     {
+        if (condition is not (JsonIgnoreConditionEx.WhenReadingNull or JsonIgnoreConditionEx.WhenReadingDefault))
+            throw new ArgumentOutOfRangeException(nameof(condition), condition, "Not an extended read condition.");
+        Condition = condition;
     }
 
-    /// <summary>Initializes a new instance with the specified condition.</summary>
-    /// <param name="condition">The condition under which the member is ignored.</param>
-    public JsonIgnoreExAttribute(JsonIgnoreConditionEx condition) => Condition = condition;
-
-    /// <summary>Gets the condition under which the member is ignored.</summary>
+    /// <summary>Gets the read condition.</summary>
     public JsonIgnoreConditionEx Condition { get; }
 }

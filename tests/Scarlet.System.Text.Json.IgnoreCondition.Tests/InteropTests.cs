@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Text.Json.Serialization.Metadata;
 using Xunit;
 
 namespace Scarlet.System.Text.Json.IgnoreCondition.Tests;
@@ -14,11 +15,104 @@ public sealed class InteropTests
 
     [Theory]
     [MemberData(nameof(Configurations))]
+    public void Read_conditions_combine_with_nullable_validation_and_write_defaults(SerializerConfiguration configuration)
+    {
+        JsonSerializerOptions options = Serializers.Create(configuration, configureOptions: static o =>
+        {
+            o.RespectNullableAnnotations = true;
+            o.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingDefault;
+        });
+
+        NonNullableReferenceModel reference = Serializers.Deserialize<NonNullableReferenceModel>(
+            """{"Name":null,"Values":null,"Field":null}""", options)!;
+        Assert.Equal("initial", reference.Name);
+        Assert.Equal(["initial"], reference.Values);
+        Assert.Equal("initial", reference.Field);
+
+        RecordModel record = Serializers.Deserialize<RecordModel>("""{"Name":null,"Age":null}""", options)!;
+        Assert.Equal("unknown", record.Name);
+        Assert.Equal(41, record.Age);
+
+        ValueModel value = Serializers.Deserialize<ValueModel>("""{"Age":null,"Season":null}""", options)!;
+        Assert.Equal(41, value.Age);
+        Assert.Equal(Season.Summer, value.Season);
+        value.Age = 0;
+        value.Season = Season.Winter;
+        using JsonDocument json = JsonDocument.Parse(Serializers.Serialize(value, options));
+        Assert.False(json.RootElement.TryGetProperty("Age", out _));
+        Assert.False(json.RootElement.TryGetProperty("Season", out _));
+    }
+
+    [Theory]
+    [MemberData(nameof(Configurations))]
+    public void Projected_members_keep_options_level_write_defaults(SerializerConfiguration configuration)
+    {
+        JsonSerializerOptions options = Serializers.Create(
+            configuration,
+            configureOptions: static o => o.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingDefault);
+
+        using JsonDocument zero = JsonDocument.Parse(Serializers.Serialize(new ProjectedWriteDefaultsModel(), options));
+        Assert.False(zero.RootElement.TryGetProperty("Count", out _));
+        Assert.False(zero.RootElement.TryGetProperty("Enabled", out _));
+        Assert.False(zero.RootElement.TryGetProperty("Id", out _));
+        Assert.Equal(0, zero.RootElement.GetProperty("Optional").GetInt32());
+        Assert.Equal(0, zero.RootElement.GetProperty("AlwaysWritten").GetInt32());
+
+        var model = new ProjectedWriteDefaultsModel { Count = 9, Enabled = true, Id = ValueModel.KnownId };
+        using JsonDocument nonzero = JsonDocument.Parse(Serializers.Serialize(model, options));
+        Assert.Equal(9, nonzero.RootElement.GetProperty("Count").GetInt32());
+        Assert.True(nonzero.RootElement.GetProperty("Enabled").GetBoolean());
+        Assert.Equal(ValueModel.KnownId, nonzero.RootElement.GetProperty("Id").GetGuid());
+    }
+
+    [Theory]
+    [MemberData(nameof(Configurations))]
+    public void Projected_members_keep_custom_write_predicates(SerializerConfiguration configuration)
+    {
+        JsonSerializerOptions options = Serializers.CreateUnmodified(configuration);
+        options.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingDefault;
+        options.TypeInfoResolver = new ExtendedIgnoreConditionResolver(options.TypeInfoResolver!.WithAddedModifier(static info =>
+        {
+            foreach (var property in info.Properties)
+            {
+                if (property.Name == "Count")
+                {
+                    property.ShouldSerialize = static (_, _) => true;
+                }
+            }
+        }));
+
+        using JsonDocument json = JsonDocument.Parse(Serializers.Serialize(new ProjectedWriteDefaultsModel(), options));
+        Assert.Equal(0, json.RootElement.GetProperty("Count").GetInt32());
+    }
+
+    [Theory]
+    [MemberData(nameof(Configurations))]
+    public void Nullable_annotations_allow_skipped_nulls_but_still_validate_other_members(SerializerConfiguration configuration)
+    {
+        JsonSerializerOptions options = Serializers.Create(
+            configuration,
+            configureOptions: static o => o.RespectNullableAnnotations = true);
+
+        NonNullableReferenceModel model = Serializers.Deserialize<NonNullableReferenceModel>(
+            """{"Name":null,"Values":null,"Field":null}""", options)!;
+        Assert.Equal("initial", model.Name);
+        Assert.Equal(["initial"], model.Values);
+        Assert.Equal("initial", model.Field);
+
+        Assert.Throws<JsonException>(() => Serializers.Deserialize<NonNullableReferenceModel>(
+            """{"Untouched":null}""", options));
+        Assert.Throws<JsonException>(() => Serializers.Serialize(
+            new NonNullableReferenceModel { Name = null! }, options));
+    }
+
+    [Theory]
+    [MemberData(nameof(Configurations))]
     public void Polymorphic_reads_keep_the_discriminator_and_the_conditions(SerializerConfiguration configuration)
     {
         JsonSerializerOptions options = Serializers.Create(configuration);
 
-        var cat = (CatShape)JsonSerializer.Deserialize<AnimalShape>(
+        var cat = (CatShape)Serializers.Deserialize<AnimalShape>(
             """{"$kind":"cat","Name":null,"Age":null,"Indoor":null}""",
             options)!;
 
@@ -33,7 +127,7 @@ public sealed class InteropTests
     {
         JsonSerializerOptions options = Serializers.Create(configuration);
 
-        string json = JsonSerializer.Serialize<AnimalShape>(new DogShape { Name = "rex", Age = 3 }, options);
+        string json = Serializers.Serialize<AnimalShape>(new DogShape { Name = "rex", Age = 3 }, options);
 
         Assert.Contains("\"$kind\":\"dog\"", json);
         Assert.Contains("\"Name\":\"rex\"", json);
@@ -50,13 +144,13 @@ public sealed class InteropTests
         var node = new GraphNode { Name = "first" };
         node.Next = node;
 
-        string json = JsonSerializer.Serialize(node, options);
-        GraphNode round = JsonSerializer.Deserialize<GraphNode>(json, options)!;
+        string json = Serializers.Serialize(node, options);
+        GraphNode round = Serializers.Deserialize<GraphNode>(json, options)!;
 
         Assert.Equal("first", round.Name);
         Assert.Same(round, round.Next);
 
-        GraphNode skipped = JsonSerializer.Deserialize<GraphNode>("""{"$id":"1","Name":null}""", options)!;
+        GraphNode skipped = Serializers.Deserialize<GraphNode>("""{"$id":"1","Name":null}""", options)!;
         Assert.Equal("initial", skipped.Name);
     }
 
@@ -66,10 +160,10 @@ public sealed class InteropTests
     {
         JsonSerializerOptions options = Serializers.Create(configuration);
 
-        PopulateModel populated = JsonSerializer.Deserialize<PopulateModel>("""{"Values":["b"]}""", options)!;
+        PopulateModel populated = Serializers.Deserialize<PopulateModel>("""{"Values":["b"]}""", options)!;
         Assert.Equal(["a", "b"], populated.Values);
 
-        PopulateModel skipped = JsonSerializer.Deserialize<PopulateModel>("""{"Values":null}""", options)!;
+        PopulateModel skipped = Serializers.Deserialize<PopulateModel>("""{"Values":null}""", options)!;
         Assert.Equal(["a"], skipped.Values);
     }
 
@@ -83,21 +177,21 @@ public sealed class InteropTests
     {
         JsonSerializerOptions options = Serializers.Create(configuration);
 
-        NumberHandlingModel fromStrings = JsonSerializer.Deserialize<NumberHandlingModel>(
+        NumberHandlingModel fromStrings = Serializers.Deserialize<NumberHandlingModel>(
             """{"Count":"9","Ratio":"2.5"}""",
             options)!;
 
         Assert.Equal(9, fromStrings.Count);
         Assert.Equal(2.5, fromStrings.Ratio);
 
-        NumberHandlingModel skipped = JsonSerializer.Deserialize<NumberHandlingModel>(
+        NumberHandlingModel skipped = Serializers.Deserialize<NumberHandlingModel>(
             """{"Count":null,"Ratio":null}""",
             options)!;
 
         Assert.Equal(3, skipped.Count);
         Assert.Equal(1.5, skipped.Ratio);
 
-        Assert.Contains("\"Ratio\":\"1.5\"", JsonSerializer.Serialize(new NumberHandlingModel(), options));
+        Assert.Contains("\"Ratio\":\"1.5\"", Serializers.Serialize(new NumberHandlingModel(), options));
     }
 
     [Theory]
@@ -109,9 +203,9 @@ public sealed class InteropTests
             configureOptions: static o => o.UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow);
 
         Assert.Throws<JsonException>(() =>
-            JsonSerializer.Deserialize<ReferenceModel>("""{"Nope":1}""", options));
+            Serializers.Deserialize<ReferenceModel>("""{"Nope":1}""", options));
 
-        ReferenceModel model = JsonSerializer.Deserialize<ReferenceModel>("""{"Name":null}""", options)!;
+        ReferenceModel model = Serializers.Deserialize<ReferenceModel>("""{"Name":null}""", options)!;
         Assert.Equal("initial", model.Name);
     }
 }

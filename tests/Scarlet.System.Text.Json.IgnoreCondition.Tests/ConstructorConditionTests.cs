@@ -66,15 +66,30 @@ public sealed class ConstructorConditionTests
 
     [Theory]
     [MemberData(nameof(Configurations))]
+    public void A_member_renamed_to_a_parameter_name_is_not_treated_as_constructor_bound(
+        SerializerConfiguration configuration)
+    {
+        JsonSerializerOptions options = Serializers.Create(configuration);
+
+        JsonNameCollisionModel model = Deserialize<JsonNameCollisionModel>(
+            """{"heading":"given","title":null}""",
+            options);
+
+        Assert.Equal("given", model.Title);
+        Assert.Equal("initial", model.Subtitle);
+    }
+
+    [Theory]
+    [MemberData(nameof(Configurations))]
     public void Records_still_serialize_normally(SerializerConfiguration configuration)
     {
         JsonSerializerOptions options = Serializers.Create(configuration);
 
-        string json = JsonSerializer.Serialize(new RecordModel("given", 9, "nick"), options);
+        string json = Serializers.Serialize(new RecordModel("given", 9, "nick"), options);
 
         Assert.Equal("""{"Name":"given","Age":9,"Nickname":"nick"}""", json);
     }
 
     private static T Deserialize<T>(string json, JsonSerializerOptions options) =>
-        JsonSerializer.Deserialize<T>(json, options)!;
+        Serializers.Deserialize<T>(json, options)!;
 }

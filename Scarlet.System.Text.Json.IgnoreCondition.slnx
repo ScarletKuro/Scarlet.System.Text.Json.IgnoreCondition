@@ -1,10 +1,12 @@
 <Solution>
   <Folder Name="/src/">
+    <Project Path="src/Scarlet.System.Text.Json.IgnoreCondition.Analyzers/Scarlet.System.Text.Json.IgnoreCondition.Analyzers.csproj" />
+    <Project Path="src/Scarlet.System.Text.Json.IgnoreCondition.Analyzers.CodeFixes/Scarlet.System.Text.Json.IgnoreCondition.Analyzers.CodeFixes.csproj" />
     <Project Path="src/Scarlet.System.Text.Json.IgnoreCondition/Scarlet.System.Text.Json.IgnoreCondition.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/Scarlet.System.Text.Json.IgnoreCondition.Analyzers.Tests/Scarlet.System.Text.Json.IgnoreCondition.Analyzers.Tests.csproj" />
     <Project Path="tests/Scarlet.System.Text.Json.IgnoreCondition.Tests/Scarlet.System.Text.Json.IgnoreCondition.Tests.csproj" />
-    <Project Path="tests/Scarlet.System.Text.Json.IgnoreCondition.AotSample/Scarlet.System.Text.Json.IgnoreCondition.AotSample.csproj" />
   </Folder>
   <Folder Name="/benchmarks/">
     <Project Path="benchmarks/Scarlet.System.Text.Json.IgnoreCondition.Benchmarks/Scarlet.System.Text.Json.IgnoreCondition.Benchmarks.csproj" />

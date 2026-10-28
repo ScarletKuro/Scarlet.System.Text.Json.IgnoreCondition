@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <OutputType>Exe</OutputType>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="xunit.v3.aot" />
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Workspaces" />
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Analyzer.Testing" />
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp.CodeFix.Testing" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/Scarlet.System.Text.Json.IgnoreCondition.Analyzers/Scarlet.System.Text.Json.IgnoreCondition.Analyzers.csproj" />
+    <ProjectReference Include="../../src/Scarlet.System.Text.Json.IgnoreCondition.Analyzers.CodeFixes/Scarlet.System.Text.Json.IgnoreCondition.Analyzers.CodeFixes.csproj" />
+    <ProjectReference Include="../../src/Scarlet.System.Text.Json.IgnoreCondition/Scarlet.System.Text.Json.IgnoreCondition.csproj" />
+  </ItemGroup>
+</Project>
