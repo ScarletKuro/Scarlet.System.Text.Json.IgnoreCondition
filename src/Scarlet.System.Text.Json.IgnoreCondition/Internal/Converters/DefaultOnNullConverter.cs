@@ -1,4 +1,3 @@
-using System.Diagnostics.CodeAnalysis;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
@@ -69,12 +68,6 @@ internal sealed class DefaultOnNullConverter<T> : JsonConverter<T>
 
         Inner(options).Write(writer, value, options);
     }
-
-    public override T ReadAsPropertyName(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) =>
-        Inner(options).ReadAsPropertyName(ref reader, typeToConvert, options);
-
-    public override void WriteAsPropertyName(Utf8JsonWriter writer, [DisallowNull] T value, JsonSerializerOptions options) =>
-        Inner(options).WriteAsPropertyName(writer, value, options);
 
     private JsonConverter<T> Inner(JsonSerializerOptions options) =>
         // Benignly racy: resolving twice yields equivalent converters.

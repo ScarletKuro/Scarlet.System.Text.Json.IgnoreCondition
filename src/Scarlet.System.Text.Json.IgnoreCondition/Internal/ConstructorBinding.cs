@@ -27,8 +27,6 @@ internal readonly struct ConstructorBinding
 
     private ConstructorBinding(ParameterInfo[]? parameters) => _parameters = parameters;
 
-    public bool HasParameters => _parameters is { Length: > 0 };
-
     public static ConstructorBinding Create(JsonTypeInfo typeInfo) =>
         typeInfo.ConstructorAttributeProvider is MethodBase constructor
             ? new ConstructorBinding(GetParameters(constructor))

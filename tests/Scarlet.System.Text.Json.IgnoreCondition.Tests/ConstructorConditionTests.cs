@@ -108,6 +108,37 @@ public sealed class ConstructorConditionTests
 
     [Theory]
     [MemberData(nameof(Configurations))]
+    public void WhenReadingDefault_also_replaces_the_type_default_with_the_parameter_default(
+        SerializerConfiguration configuration)
+    {
+        JsonSerializerOptions options = Serializers.Create(configuration);
+
+        Assert.Equal(41, Deserialize<DefaultParameterRecord>("""{"Age":null}""", options).Age);
+        Assert.Equal(41, Deserialize<DefaultParameterRecord>("""{"Age":0}""", options).Age);
+        Assert.Equal(5, Deserialize<DefaultParameterRecord>("""{"Age":5}""", options).Age);
+    }
+
+    [Theory]
+    [MemberData(nameof(Configurations))]
+    public void An_enum_parameter_falls_back_to_its_default(SerializerConfiguration configuration)
+    {
+        JsonSerializerOptions options = Serializers.Create(configuration);
+
+        Assert.Equal(Season.Summer, Deserialize<EnumParameterRecord>("""{"Season":null}""", options).Season);
+        Assert.Equal(Season.Winter, Deserialize<EnumParameterRecord>("""{"Season":0}""", options).Season);
+    }
+
+    [Theory]
+    [MemberData(nameof(Configurations))]
+    public void A_null_constructor_bound_member_is_still_written(SerializerConfiguration configuration)
+    {
+        string json = Serializers.Serialize(new RecordModel("given", 9, Nickname: null), Serializers.Create(configuration));
+
+        Assert.Equal("""{"Name":"given","Age":9,"Nickname":null}""", json);
+    }
+
+    [Theory]
+    [MemberData(nameof(Configurations))]
     public void Records_still_serialize_normally(SerializerConfiguration configuration)
     {
         JsonSerializerOptions options = Serializers.Create(configuration);

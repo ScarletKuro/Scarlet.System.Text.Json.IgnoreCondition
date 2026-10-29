@@ -104,6 +104,14 @@ public sealed class JsonNameCollisionModel
     public string? Subtitle { get; set; } = "initial";
 }
 
+/// <summary>WhenReadingDefault on a constructor parameter: an incoming 0 also falls back to the parameter default.</summary>
+public sealed record DefaultParameterRecord(
+    [property: JsonIgnoreEx(JsonIgnoreConditionEx.WhenReadingDefault)] int Age = 41);
+
+/// <summary>An enum constructor parameter, whose default value reflection reports as the underlying integer.</summary>
+public sealed record EnumParameterRecord(
+    [property: JsonIgnoreEx(JsonIgnoreConditionEx.WhenReadingNull)] Season Season = Season.Summer);
+
 /// <summary>A constructor parameter with no default, which can only fall back to the type default.</summary>
 public sealed record RequiredParameterRecordModel(
     [property: JsonIgnoreEx(JsonIgnoreConditionEx.WhenReadingNull)] string Name);
@@ -412,6 +420,12 @@ public enum Shade
 public sealed class UnregisteredValueTypeModel
 {
     public Shade Shade { get; set; } = Shade.Dark;
+}
+
+/// <summary>An unregistered closed generic struct, reached only by an options-level default.</summary>
+public sealed class UnregisteredGenericModel
+{
+    public ArrayBox<int> Box { get; set; }
 }
 
 /// <summary>The same unregistered type behind <see cref="Nullable{T}"/>.</summary>

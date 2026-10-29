@@ -1,4 +1,3 @@
-using System.Diagnostics.CodeAnalysis;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
@@ -17,10 +16,12 @@ namespace Scarlet.System.Text.Json.IgnoreCondition.Internal.Converters;
 internal sealed class NullableWrapConverter<T> : JsonConverter<T?>
     where T : struct
 {
-    private JsonConverter<T>? _inner;
+    private readonly JsonConverter<T> _inner;
 
-    public NullableWrapConverter(JsonConverter<T>? inner) => _inner = inner;
+    public NullableWrapConverter(JsonConverter<T> inner) => _inner = inner;
 
+    // The serializer handles a JSON null for Nullable<T> itself and only calls the converter for values;
+    // the null checks keep the converter correct if it is ever called directly.
     public override T? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
     {
         if (reader.TokenType == JsonTokenType.Null)
@@ -28,7 +29,7 @@ internal sealed class NullableWrapConverter<T> : JsonConverter<T?>
             return null;
         }
 
-        return Inner(options).Read(ref reader, typeof(T), options);
+        return _inner.Read(ref reader, typeof(T), options);
     }
 
     public override void Write(Utf8JsonWriter writer, T? value, JsonSerializerOptions options)
@@ -39,15 +40,6 @@ internal sealed class NullableWrapConverter<T> : JsonConverter<T?>
             return;
         }
 
-        Inner(options).Write(writer, value.Value, options);
+        _inner.Write(writer, value.Value, options);
     }
-
-    public override T? ReadAsPropertyName(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) =>
-        Inner(options).ReadAsPropertyName(ref reader, typeof(T), options);
-
-    public override void WriteAsPropertyName(Utf8JsonWriter writer, [DisallowNull] T? value, JsonSerializerOptions options) =>
-        Inner(options).WriteAsPropertyName(writer, value.Value, options);
-
-    private JsonConverter<T> Inner(JsonSerializerOptions options) =>
-        _inner ??= (JsonConverter<T>)options.GetTypeInfo(typeof(T)).Converter;
 }

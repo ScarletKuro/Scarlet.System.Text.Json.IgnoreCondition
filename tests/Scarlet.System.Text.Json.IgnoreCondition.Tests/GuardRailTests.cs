@@ -45,6 +45,40 @@ public sealed class GuardRailTests
         [property: JsonIgnoreEx(JsonIgnoreConditionEx.WhenReadingNull)]
         [property: JsonNumberHandling(JsonNumberHandling.AllowReadingFromString)] int Count = 3);
 
+    [JsonNumberHandling(JsonNumberHandling.AllowReadingFromString)]
+    public sealed record ClassNumberHandlingParameterModel(
+        [property: JsonIgnoreEx(JsonIgnoreConditionEx.WhenReadingNull)] int Count = 3);
+
+    public sealed record PlainNumberParameterModel(
+        [property: JsonIgnoreEx(JsonIgnoreConditionEx.WhenReadingNull)] int Count = 3);
+
+    public sealed record NullFactoryParameterModel(
+        [property: JsonIgnoreEx(JsonIgnoreConditionEx.WhenReadingNull)]
+        [property: JsonConverter(typeof(NullConverterFactory))] int Count = 3);
+
+    /// <summary>A factory that claims the type but creates nothing.</summary>
+    public sealed class NullConverterFactory : JsonConverterFactory
+    {
+        public override bool CanConvert(Type typeToConvert) => true;
+
+        public override JsonConverter? CreateConverter(Type typeToConvert, JsonSerializerOptions options) => null;
+    }
+
+    /// <summary>
+    /// Every refused model that is otherwise valid, for the Skip theory. NullFactoryParameterModel is not:
+    /// with the condition skipped, the serializer itself rejects a factory that creates no converter.
+    /// </summary>
+    public static TheoryData<Type> RefusedModels =>
+    [
+        typeof(RequiredMemberModel),
+        typeof(ReadOnlyMemberModel),
+        typeof(ExtensionDataModel),
+        typeof(ComplexParameterModel),
+        typeof(ObjectParameterModel),
+        typeof(NumberHandlingParameterModel),
+        typeof(ClassNumberHandlingParameterModel),
+    ];
+
 
     [Fact]
     public void A_required_member_is_refused()
@@ -105,6 +139,51 @@ public sealed class GuardRailTests
             Deserialize<NumberHandlingParameterModel>("""{"Count":null}"""));
 
         Assert.Contains("JsonNumberHandling", error.Message);
+    }
+
+    /// <summary>
+    /// Number handling also reaches a parameter from its declaring type or from the options, and dropping
+    /// it there would be just as silent.
+    /// </summary>
+    [Fact]
+    public void Number_handling_from_the_type_or_the_options_is_refused_too()
+    {
+        NotSupportedException fromType = Assert.Throws<NotSupportedException>(() =>
+            Deserialize<ClassNumberHandlingParameterModel>("""{"Count":"5"}"""));
+        Assert.Contains("JsonNumberHandling", fromType.Message);
+
+        JsonSerializerOptions options = Serializers.Create(
+            SerializerConfiguration.Reflection,
+            configureOptions: static options => options.NumberHandling = JsonNumberHandling.AllowReadingFromString);
+        NotSupportedException fromOptions = Assert.Throws<NotSupportedException>(() =>
+            Serializers.Deserialize<PlainNumberParameterModel>("""{"Count":"5"}""", options));
+        Assert.Contains("JsonNumberHandling", fromOptions.Message);
+    }
+
+    [Fact]
+    public void A_converter_factory_that_creates_no_converter_is_refused()
+    {
+        NotSupportedException error = Assert.Throws<NotSupportedException>(() =>
+            Deserialize<NullFactoryParameterModel>("""{"Count":null}"""));
+
+        Assert.Contains("did not create a converter", error.Message);
+        Assert.Contains(nameof(NullConverterFactory), error.Message);
+    }
+
+    /// <summary>
+    /// Skip must leave every refused member exactly as the serializer would have it: no exception, and
+    /// no half-applied condition.
+    /// </summary>
+    [Theory]
+    [MemberData(nameof(RefusedModels))]
+    public void Skip_resolves_every_refused_member_without_throwing(Type modelType)
+    {
+        JsonSerializerOptions options = Serializers.Create(
+            SerializerConfiguration.Reflection,
+            static settings => settings.UnsupportedMemberBehavior = UnsupportedMemberBehavior.Skip);
+        options.MakeReadOnly();
+
+        Assert.NotNull(options.GetTypeInfo(modelType));
     }
 
     [Fact]

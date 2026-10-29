@@ -195,6 +195,29 @@ public sealed class ValueTypeRegistrationGeneratorTests
         Assert.Null(generated);
     }
 
+    /// <summary>
+    /// Record parameters are found by syntax: any property-targeted attribute list. Only parameters whose
+    /// synthesized property actually carries JsonIgnoreEx may be registered.
+    /// </summary>
+    [Fact]
+    public void Record_parameters_with_other_property_attributes_are_not_registered()
+    {
+        string? generated = Generate(Imports + """
+            using System.Text.Json.Serialization;
+
+            public enum Renamed { A }
+            public enum Annotated { A }
+
+            public sealed record Model(
+                [property: JsonPropertyName("renamed")] Renamed First,
+                [property: JsonPropertyName("annotated"), JsonIgnoreEx(JsonIgnoreConditionEx.WhenReadingNull)] Annotated Second);
+            """);
+
+        Assert.NotNull(generated);
+        Assert.Contains("RegisterValueType<global::Annotated>", generated);
+        Assert.DoesNotContain("Renamed", generated);
+    }
+
     [Fact]
     public void Nothing_is_generated_without_annotated_members()
     {

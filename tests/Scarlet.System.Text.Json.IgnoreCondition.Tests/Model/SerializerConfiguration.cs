@@ -58,6 +58,9 @@ public enum SerializerConfiguration
 [JsonSerializable(typeof(ConverterFactoryRecord))]
 [JsonSerializable(typeof(ObjectPayloadModel))]
 [JsonSerializable(typeof(ArrayArgumentModel))]
+[JsonSerializable(typeof(DefaultParameterRecord))]
+[JsonSerializable(typeof(EnumParameterRecord))]
+[JsonSerializable(typeof(UnregisteredGenericModel))]
 internal sealed partial class DefaultModeContext : JsonSerializerContext;
 
 [JsonSourceGenerationOptions(GenerationMode = JsonSourceGenerationMode.Metadata)]
@@ -96,6 +99,9 @@ internal sealed partial class DefaultModeContext : JsonSerializerContext;
 [JsonSerializable(typeof(ConverterFactoryRecord))]
 [JsonSerializable(typeof(ObjectPayloadModel))]
 [JsonSerializable(typeof(ArrayArgumentModel))]
+[JsonSerializable(typeof(DefaultParameterRecord))]
+[JsonSerializable(typeof(EnumParameterRecord))]
+[JsonSerializable(typeof(UnregisteredGenericModel))]
 internal sealed partial class MetadataModeContext : JsonSerializerContext;
 
 public static class Serializers

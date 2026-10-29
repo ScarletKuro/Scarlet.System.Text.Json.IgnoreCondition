@@ -205,6 +205,43 @@ public sealed class OptionsDefaultTests
         Assert.Equal(Priority.High, model.Priority);
     }
 
+    /// <summary>The message names the exact line to add, so a generic struct is spelled in C#, not as Box`1.</summary>
+    [Theory]
+    [MemberData(nameof(Configurations))]
+    public void RequireValueTypeRegistration_spells_a_generic_struct_in_CSharp(SerializerConfiguration configuration)
+    {
+        JsonSerializerOptions options = Serializers.Create(
+            configuration,
+            static settings =>
+            {
+                settings.DefaultReadCondition = JsonIgnoreConditionEx.WhenReadingNull;
+                settings.RequireValueTypeRegistration = true;
+            });
+
+        NotSupportedException error = Assert.Throws<NotSupportedException>(() =>
+            Serializers.Deserialize<UnregisteredGenericModel>("{}", options));
+
+        Assert.Contains("RegisterValueType<ArrayBox<Int32>>()", error.Message);
+    }
+
+    [Theory]
+    [MemberData(nameof(Configurations))]
+    public void RequireValueTypeRegistration_with_Skip_leaves_the_built_in_behaviour(SerializerConfiguration configuration)
+    {
+        JsonSerializerOptions options = Serializers.Create(
+            configuration,
+            static settings =>
+            {
+                settings.DefaultReadCondition = JsonIgnoreConditionEx.WhenReadingNull;
+                settings.RequireValueTypeRegistration = true;
+                settings.UnsupportedMemberBehavior = UnsupportedMemberBehavior.Skip;
+            });
+
+        Assert.Equal(Shade.Dark, Serializers.Deserialize<UnregisteredValueTypeModel>("{}", options)!.Shade);
+        Assert.Throws<JsonException>(() =>
+            Serializers.Deserialize<UnregisteredValueTypeModel>("""{"Shade":null}""", options));
+    }
+
     [Fact]
     public void Settings_changed_after_the_resolver_is_created_have_no_effect()
     {

@@ -19,6 +19,7 @@
   <ItemGroup Condition="'$(NativeAotTests)' == 'true'">
     <!-- These tests intentionally exercise reflection-only contracts absent from the contexts. -->
     <Compile Remove="GuardRailTests.cs" />
+    <Compile Remove="ReflectionResolverTests.cs" />
   </ItemGroup>
 
   <ItemGroup>
