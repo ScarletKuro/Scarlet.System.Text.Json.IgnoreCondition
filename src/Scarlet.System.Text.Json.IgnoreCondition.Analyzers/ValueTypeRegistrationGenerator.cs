@@ -53,7 +53,9 @@ public sealed class ValueTypeRegistrationGenerator : IIncrementalGenerator
         {
             var all = source.Left.Left.AddRange(source.Left.Right);
             if (!source.Right || all.IsEmpty)
+            {
                 return;
+            }
 
             output.AddSource("JsonIgnoreExValueTypeRegistrations.g.cs", Render(all));
         });
@@ -62,12 +64,16 @@ public sealed class ValueTypeRegistrationGenerator : IIncrementalGenerator
     private static string? GetRecordParameterType(GeneratorSyntaxContext syntax, CancellationToken token)
     {
         if (syntax.SemanticModel.GetDeclaredSymbol(syntax.Node, token) is not IParameterSymbol { ContainingType: { } record } parameter)
+        {
             return null;
+        }
 
         var property = record.GetMembers(parameter.Name).OfType<IPropertySymbol>().FirstOrDefault();
         if (property is null || !property.GetAttributes().Any(static attribute =>
                 attribute.AttributeClass?.ToDisplayString() == AttributeName))
+        {
             return null;
+        }
 
         return GetRegistrableType(property, syntax.SemanticModel.Compilation);
     }
@@ -90,7 +96,9 @@ public sealed class ValueTypeRegistrationGenerator : IIncrementalGenerator
             RootedTypes.Contains(named.ToDisplayString()) ||
             !CanBeNamedFromGeneratedCode(named) ||
             !compilation.IsSymbolAccessibleWithin(named, compilation.Assembly))
+        {
             return null;
+        }
 
         return named.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
     }
@@ -104,11 +112,15 @@ public sealed class ValueTypeRegistrationGenerator : IIncrementalGenerator
     private static bool CanBeNamedFromGeneratedCode(ITypeSymbol type)
     {
         if (type is IArrayTypeSymbol array)
+        {
             return CanBeNamedFromGeneratedCode(array.ElementType);
+        }
 
         // dynamic is emitted as a valid C# type argument and has the metadata identity of object.
         if (type is IDynamicTypeSymbol)
+        {
             return true;
+        }
 
         if (type is not INamedTypeSymbol named)
             return false;
@@ -116,12 +128,16 @@ public sealed class ValueTypeRegistrationGenerator : IIncrementalGenerator
         for (var current = named; current is not null; current = current.ContainingType)
         {
             if (current.IsFileLocal)
+            {
                 return false;
+            }
 
             foreach (var argument in current.TypeArguments)
             {
                 if (!CanBeNamedFromGeneratedCode(argument))
+                {
                     return false;
+                }
             }
         }
 
@@ -148,12 +164,14 @@ public sealed class ValueTypeRegistrationGenerator : IIncrementalGenerator
         builder.AppendLine("        internal static void Register()");
         builder.AppendLine("        {");
 
-        foreach (var type in new SortedSet<string>(types.Select(static type => type!), global::System.StringComparer.Ordinal))
+        foreach (var type in new SortedSet<string>(types.Select(static type => type!),
+                     global::System.StringComparer.Ordinal))
             builder.AppendLine($"            global::{ResolverName}.RegisterValueType<{type}>();");
 
         builder.AppendLine("        }");
         builder.AppendLine("    }");
         builder.AppendLine("}");
+
         return builder.ToString();
     }
 }

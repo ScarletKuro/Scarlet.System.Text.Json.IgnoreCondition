@@ -524,6 +524,15 @@ public sealed class TokenConverter : JsonConverter<Token>
         writer.WriteStringValue(value.Text);
 }
 
+/// <summary>A factory, registered in the options, whose converter reads JSON null itself.</summary>
+public sealed class NullAsTextConverterFactory : JsonConverterFactory
+{
+    public override bool CanConvert(Type typeToConvert) => typeToConvert == typeof(string);
+
+    public override JsonConverter CreateConverter(Type typeToConvert, JsonSerializerOptions options) =>
+        new NullAsTextConverter();
+}
+
 public sealed class TypeLevelConverterModel
 {
     [JsonIgnoreEx(JsonIgnoreConditionEx.WhenReadingNull)]
@@ -540,6 +549,27 @@ public sealed class BaseTypeOptionsConverter : JsonConverter<object>
 
     public override void Write(Utf8JsonWriter writer, object value, JsonSerializerOptions options) =>
         writer.WriteNumberValue((int)value);
+}
+
+/// <summary>A converter for a base type that accepts int and reads JSON null itself, as -1.</summary>
+public sealed class BaseTypeNullIntOptionsConverter : JsonConverter<object>
+{
+    public override bool HandleNull => true;
+
+    public override bool CanConvert(Type typeToConvert) => typeToConvert == typeof(int);
+
+    public override object Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) =>
+        reader.TokenType == JsonTokenType.Null ? -1 : reader.GetInt32();
+
+    public override void Write(Utf8JsonWriter writer, object value, JsonSerializerOptions options) =>
+        writer.WriteNumberValue((int)value);
+}
+
+/// <summary>A non-nullable value type, so the member is re-declared as T? around the converter in effect.</summary>
+public sealed class OptionsBaseNullConverterModel
+{
+    [JsonIgnoreEx(JsonIgnoreConditionEx.WhenReadingNull)]
+    public int Count { get; set; } = 5;
 }
 
 public sealed record OptionsBaseConverterRecord(

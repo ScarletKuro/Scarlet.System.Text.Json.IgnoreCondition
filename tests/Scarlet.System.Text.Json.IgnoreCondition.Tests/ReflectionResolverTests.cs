@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using Xunit;
 
 namespace Scarlet.System.Text.Json.IgnoreCondition.Tests;
@@ -12,6 +13,46 @@ namespace Scarlet.System.Text.Json.IgnoreCondition.Tests;
 /// </remarks>
 public sealed class ReflectionResolverTests
 {
+    /// <summary>
+    /// A JsonConverterAttribute subclass that creates its converter itself rather than naming a type. The
+    /// source generator rejects these (SYSLIB1223), so only the reflection resolver can meet one.
+    /// </summary>
+    [AttributeUsage(AttributeTargets.Class)]
+    public sealed class TokenConverterAttribute : JsonConverterAttribute
+    {
+        public override JsonConverter CreateConverter(Type typeToConvert) => new AttributedTokenConverter();
+    }
+
+    [TokenConverter]
+    public sealed record AttributedToken(string Text);
+
+    /// <summary>Reads JSON null itself, as a sentinel token.</summary>
+    public sealed class AttributedTokenConverter : JsonConverter<AttributedToken>
+    {
+        public override bool HandleNull => true;
+
+        public override AttributedToken Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) =>
+            new(reader.TokenType == JsonTokenType.Null ? "from-null" : reader.GetString()!);
+
+        public override void Write(Utf8JsonWriter writer, AttributedToken value, JsonSerializerOptions options) =>
+            writer.WriteStringValue(value.Text);
+    }
+
+    public sealed class AttributedTokenModel
+    {
+        [JsonIgnoreEx(JsonIgnoreConditionEx.WhenReadingNull)]
+        public AttributedToken? Token { get; set; } = new("initial");
+    }
+
+    [Fact]
+    public void A_type_attribute_that_creates_its_converter_is_handled()
+    {
+        JsonSerializerOptions options = Serializers.Create(SerializerConfiguration.Reflection);
+
+        Assert.Equal("initial", Serializers.Deserialize<AttributedTokenModel>("""{"Token":null}""", options).Token?.Text);
+        Assert.Equal("x", Serializers.Deserialize<AttributedTokenModel>("""{"Token":"x"}""", options).Token?.Text);
+    }
+
     [Fact]
     public void The_parameterless_constructor_applies_the_conditions()
     {

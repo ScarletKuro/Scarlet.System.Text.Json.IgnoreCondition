@@ -43,6 +43,19 @@ public sealed class ConverterSourceTests
             Serializers.Serialize(new OptionsConverterModel { Name = null, Optional = null }, options));
     }
 
+    /// <summary>A factory in the options is expanded first: its converter is what reads the null.</summary>
+    [Theory]
+    [MemberData(nameof(Configurations))]
+    public void An_options_converter_factory_whose_converter_reads_null_is_handled(SerializerConfiguration configuration)
+    {
+        JsonSerializerOptions options = Serializers.Create(
+            configuration,
+            configureOptions: static options => options.Converters.Add(new NullAsTextConverterFactory()));
+
+        Assert.Equal("initial", Serializers.Deserialize<OptionsConverterModel>("""{"Name":null}""", options).Name);
+        Assert.Equal("x", Serializers.Deserialize<OptionsConverterModel>("""{"Name":"x"}""", options).Name);
+    }
+
     [Theory]
     [MemberData(nameof(Configurations))]
     public void A_type_level_converter_that_reads_null_does_not_overwrite_the_initializer(
@@ -52,6 +65,41 @@ public sealed class ConverterSourceTests
 
         Assert.Equal("initial", Serializers.Deserialize<TypeLevelConverterModel>("""{"Token":null}""", options).Token?.Text);
         Assert.Equal("x", Serializers.Deserialize<TypeLevelConverterModel>("""{"Token":"x"}""", options).Token?.Text);
+    }
+
+    /// <summary>
+    /// A non-nullable value type is re-declared as T?, and a null can only be kept from the converter in
+    /// effect if that converter can be lifted over T?, which needs it typed for exactly T. A base-type
+    /// converter that reads null itself cannot be, so the condition is refused instead of letting it
+    /// overwrite the initializer.
+    /// </summary>
+    [Theory]
+    [MemberData(nameof(Configurations))]
+    public void A_base_type_options_converter_that_reads_null_is_refused_on_a_value_type(
+        SerializerConfiguration configuration)
+    {
+        JsonSerializerOptions options = Serializers.Create(
+            configuration,
+            configureOptions: static options => options.Converters.Add(new BaseTypeNullIntOptionsConverter()));
+
+        NotSupportedException error = Assert.Throws<NotSupportedException>(() =>
+            Serializers.Deserialize<OptionsBaseNullConverterModel>("""{"Count":null}""", options));
+
+        Assert.Contains("reads JSON null itself", error.Message);
+        Assert.Contains(nameof(BaseTypeNullIntOptionsConverter), error.Message);
+    }
+
+    [Theory]
+    [MemberData(nameof(Configurations))]
+    public void Skip_leaves_a_base_type_options_converter_to_the_serializer(SerializerConfiguration configuration)
+    {
+        JsonSerializerOptions options = Serializers.Create(
+            configuration,
+            static settings => settings.UnsupportedMemberBehavior = UnsupportedMemberBehavior.Skip,
+            static options => options.Converters.Add(new BaseTypeNullIntOptionsConverter()));
+
+        Assert.Equal(-1, Serializers.Deserialize<OptionsBaseNullConverterModel>("""{"Count":null}""", options).Count);
+        Assert.Equal(7, Serializers.Deserialize<OptionsBaseNullConverterModel>("""{"Count":7}""", options).Count);
     }
 
     /// <summary>

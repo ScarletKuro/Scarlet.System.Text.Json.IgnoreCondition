@@ -92,7 +92,9 @@ internal sealed class ExtendedIgnoreConditionModifier
         JsonIgnoreConditionEx? read = null;
         if (property.AttributeProvider?.GetCustomAttributes(typeof(JsonIgnoreExAttribute), inherit: true)
             is { Length: > 0 } attributes)
+        {
             read = ((JsonIgnoreExAttribute)attributes[0]).Condition;
+        }
 
         bool isExplicit = read is not null;
         if (property.AttributeProvider?.GetCustomAttributes(typeof(JsonIgnoreAttribute), inherit: true)
@@ -100,12 +102,16 @@ internal sealed class ExtendedIgnoreConditionModifier
         {
             var native = ((JsonIgnoreAttribute)nativeAttributes[0]).Condition;
             if (isExplicit && IgnoreConditionRules.NativeConflictsWithExtended((int)native))
+            {
                 throw new NotSupportedException(
                     $"'{property.DeclaringType}.{MemberNameOf(property) ?? property.Name}' declares conflicting " +
                     $"read-side ignore conditions: native '{native}' and extended '{read}'.");
+            }
 
             if (!isExplicit && IgnoreConditionRules.NativeSuppressesReadDefault((int)native))
+            {
                 return default;
+            }
         }
 
         return new MemberCondition(read ?? _defaultReadCondition, isExplicit);

@@ -18,6 +18,5 @@ public sealed partial class IgnoreConditionAnalyzer
         "JsonIgnoreEx on '{0}' has no effect because JsonIgnore always ignores the member",
         "Usage", DiagnosticSeverity.Warning, isEnabledByDefault: true);
 
-    public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics =>
-        ImmutableArray.Create(Conflict, Ineffective);
+    public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics => [Conflict, Ineffective];
 }

@@ -12,8 +12,10 @@ namespace Scarlet.System.Text.Json.IgnoreCondition.Analyzers;
 [ExportCodeFixProvider(LanguageNames.CSharp, Name = nameof(IgnoreConditionCodeFixProvider)), Shared]
 public sealed class IgnoreConditionCodeFixProvider : CodeFixProvider
 {
-    public override ImmutableArray<string> FixableDiagnosticIds => ImmutableArray.Create(
-        IgnoreConditionAnalyzer.ConflictId, IgnoreConditionAnalyzer.IneffectiveId);
+    public override ImmutableArray<string> FixableDiagnosticIds =>
+    [
+        IgnoreConditionAnalyzer.ConflictId, IgnoreConditionAnalyzer.IneffectiveId
+    ];
 
     public override FixAllProvider GetFixAllProvider() => WellKnownFixAllProviders.BatchFixer;
 
@@ -21,13 +23,18 @@ public sealed class IgnoreConditionCodeFixProvider : CodeFixProvider
     {
         var root = await context.Document.GetSyntaxRootAsync(context.CancellationToken).ConfigureAwait(false);
         if (root is null)
+        {
             return;
+        }
 
         var diagnostic = context.Diagnostics.First();
-        var attribute = root.FindNode(diagnostic.Location.SourceSpan, getInnermostNodeForTie: true)
+        var attribute = root
+            .FindNode(diagnostic.Location.SourceSpan, getInnermostNodeForTie: true)
             .FirstAncestorOrSelf<AttributeSyntax>();
         if (attribute is null)
+        {
             return;
+        }
 
         string removeTitle = diagnostic.Id == IgnoreConditionAnalyzer.ConflictId
             ? $"Keep {diagnostic.Properties["PreviousCondition"]}; remove {diagnostic.Properties["Condition"]}"
@@ -35,7 +42,7 @@ public sealed class IgnoreConditionCodeFixProvider : CodeFixProvider
         context.RegisterCodeFix(CodeAction.Create(removeTitle,
             token => RemoveAsync(context.Document, attribute, token), "RemoveCurrentCondition"), diagnostic);
 
-        if (diagnostic.Id == IgnoreConditionAnalyzer.ConflictId && diagnostic.AdditionalLocations.Count > 0 &&
+        if (diagnostic is { Id: IgnoreConditionAnalyzer.ConflictId, AdditionalLocations.Count: > 0 } &&
             diagnostic.AdditionalLocations[0].SourceTree == root.SyntaxTree &&
             root.FindNode(diagnostic.AdditionalLocations[0].SourceSpan, getInnermostNodeForTie: true)
                 .FirstAncestorOrSelf<AttributeSyntax>() is { } earlier)
@@ -58,7 +65,10 @@ public sealed class IgnoreConditionCodeFixProvider : CodeFixProvider
         var changed = root.RemoveNode(root.GetCurrentNode(remove)!, options | SyntaxRemoveOptions.KeepUnbalancedDirectives)!;
         var currentMember = changed.GetCurrentNode(member);
         if (currentMember is not null)
+        {
             changed = changed.ReplaceNode(currentMember, currentMember.WithAdditionalAnnotations(Formatter.Annotation));
+        }
+
         return document.WithSyntaxRoot(changed);
     }
 }

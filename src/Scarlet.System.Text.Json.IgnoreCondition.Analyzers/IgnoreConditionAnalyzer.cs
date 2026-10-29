@@ -20,7 +20,9 @@ public sealed partial class IgnoreConditionAnalyzer : DiagnosticAnalyzer
             var extendedType = start.Compilation.GetTypeByMetadataName(ExtendedAttributeName);
             var nativeType = start.Compilation.GetTypeByMetadataName(NativeAttributeName);
             if (extendedType is null || nativeType is null)
+            {
                 return;
+            }
 
             start.RegisterSymbolAction(c => Analyze(c, extendedType, nativeType), SymbolKind.Property, SymbolKind.Field);
         });
@@ -41,44 +43,60 @@ public sealed partial class IgnoreConditionAnalyzer : DiagnosticAnalyzer
         {
             if (SymbolEqualityComparer.Default.Equals(attribute.AttributeClass, extendedType))
             {
-                if (attribute.ConstructorArguments.Length == 1 &&
-                    attribute.ConstructorArguments[0].Value is int value && value is 0 or 1)
+                if (attribute.ConstructorArguments is [{ Value: int value and (0 or 1) } _])
+                {
                     extended.Add((attribute, value == 0 ? "WhenReadingNull" : "WhenReadingDefault"));
+                }
             }
             else if (SymbolEqualityComparer.Default.Equals(attribute.AttributeClass, nativeType))
             {
                 native = attribute;
                 foreach (var argument in attribute.NamedArguments)
-                    if (argument.Key == "Condition" && argument.Value.Value is int value)
+                {
+                    if (argument is { Key: "Condition", Value.Value: int value })
+                    {
                         nativeCondition = value;
+                    }
+                }
             }
         }
 
         if (native is null || extended.Count == 0)
+        {
             return;
+        }
 
         DiagnosticDescriptor descriptor;
         if (IgnoreConditionRules.NativeConflictsWithExtended(nativeCondition))
+        {
             descriptor = Conflict;
+        }
         else if (IgnoreConditionRules.NativeMasksExtended(nativeCondition))
+        {
             descriptor = Ineffective;
+        }
         else
+        {
             return;
+        }
 
         var nativeSyntax = native.ApplicationSyntaxReference?.GetSyntax(context.CancellationToken);
         if (nativeSyntax is null)
+        {
             return;
+        }
 
         foreach (var item in extended)
         {
             var syntax = item.Attribute.ApplicationSyntaxReference?.GetSyntax(context.CancellationToken);
             if (syntax is null)
+            {
                 continue;
+            }
 
-            object[] arguments = descriptor == Conflict
-                ? new object[] { context.Symbol.Name, item.Condition } : new object[] { context.Symbol.Name };
+            object[] arguments = descriptor == Conflict ? [context.Symbol.Name, item.Condition] : [context.Symbol.Name];
             context.ReportDiagnostic(Diagnostic.Create(descriptor, syntax.GetLocation(),
-                additionalLocations: new[] { nativeSyntax.GetLocation() },
+                additionalLocations: [nativeSyntax.GetLocation()],
                 properties: ImmutableDictionary<string, string?>.Empty
                     .Add("Condition", item.Condition).Add("PreviousCondition", "WhenReading"),
                 messageArgs: arguments));
