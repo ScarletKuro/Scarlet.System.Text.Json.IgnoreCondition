@@ -25,6 +25,11 @@
     <PackageReference Include="xunit.v3.aot" />
   </ItemGroup>
 
+  <!-- Coverage is collected from the managed run; the native binary is published without a collector. -->
+  <ItemGroup Condition="'$(NativeAotTests)' != 'true'">
+    <PackageReference Include="Microsoft.Testing.Extensions.CodeCoverage" />
+  </ItemGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\..\src\Scarlet.System.Text.Json.IgnoreCondition\Scarlet.System.Text.Json.IgnoreCondition.csproj" />
     <!-- The package delivers the analyzer assembly, and with it the registration generator, to consumers;

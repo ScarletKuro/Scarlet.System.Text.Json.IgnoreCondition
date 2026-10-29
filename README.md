@@ -1,4 +1,8 @@
 # Scarlet.System.Text.Json.IgnoreCondition
+[![Nuget](https://img.shields.io/nuget/v/Scarlet.System.Text.Json.IgnoreCondition?color=ff4081&logo=nuget)](https://www.nuget.org/packages/Scarlet.System.Text.Json.IgnoreCondition/)
+[![Nuget](https://img.shields.io/nuget/dt/Scarlet.System.Text.Json.IgnoreCondition?color=ff4081&label=nuget%20downloads&logo=nuget)](https://www.nuget.org/packages/Scarlet.System.Text.Json.IgnoreCondition/)
+[![GitHub](https://img.shields.io/github/license/ScarletKuro/Scarlet.System.Text.Json.IgnoreCondition?color=594ae2&logo=github)](https://github.com/ScarletKuro/Scarlet.System.Text.Json.IgnoreCondition/blob/master/LICENSE)
+[![codecov](https://codecov.io/github/ScarletKuro/Scarlet.System.Text.Json.IgnoreCondition/graph/badge.svg?token=UF5Q4EFWDG)](https://codecov.io/github/ScarletKuro/Scarlet.System.Text.Json.IgnoreCondition)
 
 `WhenReadingNull` and `WhenReadingDefault` for `System.Text.Json`, for both the reflection-based and
 source-generated serializers, NativeAOT included. Standard ignore conditions use native `[JsonIgnore]`.
@@ -244,9 +248,14 @@ compiles the same behavioral tests for both source-generated modes, excludes ref
 and disables serializer reflection. The published native binary also asserts that dynamic code is
 unavailable. Referencing the AOT test package alone does not replace publishing and running it.
 
-The CI workflow runs the managed tests, packs the library, and publishes and executes the NativeAOT
-tests on Windows and Linux. Package metadata, including the repository URL, is declared in
-`Directory.Build.props`, so a local pack produces the same package as CI.
+CI runs on every branch push (`continuous.yml`): the managed tests with coverage, then the NativeAOT
+tests published and executed on Linux (`test.yml`), and a pack uploaded as a build artifact.
+Package metadata, including the repository URL, is declared in `Directory.Build.props`, so a local pack
+produces the same package as CI.
+
+Releases are cut by pushing a SemVer tag, such as `1.0.0` or `1.1.0-preview.1`. `release.yml` takes the
+package version from the tag, runs the full test matrix on the tagged commit, and publishes to NuGet.org
+only if it passes, using trusted publishing rather than a stored API key.
 
 ## Licence
 
