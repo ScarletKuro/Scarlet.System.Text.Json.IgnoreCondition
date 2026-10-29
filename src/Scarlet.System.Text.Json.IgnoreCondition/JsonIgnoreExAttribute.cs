@@ -19,7 +19,7 @@ namespace Scarlet.System.Text.Json.IgnoreCondition;
 /// public string? Name { get; set; } = "initial";
 /// </code>
 /// </example>
-[AttributeUsage(AttributeTargets.Property | AttributeTargets.Field, AllowMultiple = false)]
+[AttributeUsage(AttributeTargets.Property | AttributeTargets.Field)]
 public sealed class JsonIgnoreExAttribute : JsonAttribute
 {
     /// <summary>Initializes the attribute with one of the extended read conditions.</summary>
@@ -28,7 +28,10 @@ public sealed class JsonIgnoreExAttribute : JsonAttribute
     public JsonIgnoreExAttribute(JsonIgnoreConditionEx condition)
     {
         if (condition is not (JsonIgnoreConditionEx.WhenReadingNull or JsonIgnoreConditionEx.WhenReadingDefault))
+        {
             throw new ArgumentOutOfRangeException(nameof(condition), condition, "Not an extended read condition.");
+        }
+
         Condition = condition;
     }
 

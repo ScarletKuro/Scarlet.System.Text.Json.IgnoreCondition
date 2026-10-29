@@ -1,4 +1,3 @@
-using Xunit;
 using Verify = Scarlet.System.Text.Json.IgnoreCondition.Analyzers.Tests.Verifiers.CSharpAnalyzerVerifier<Scarlet.System.Text.Json.IgnoreCondition.Analyzers.IgnoreConditionAnalyzer>;
 
 namespace Scarlet.System.Text.Json.IgnoreCondition.Analyzers.Tests;

@@ -32,8 +32,7 @@ public sealed class ExtendedIgnoreConditionSettings
         get => _defaultReadCondition;
         set
         {
-            if (value is { } condition &&
-                condition is not (JsonIgnoreConditionEx.WhenReadingNull or JsonIgnoreConditionEx.WhenReadingDefault))
+            if (value is { } condition and not (JsonIgnoreConditionEx.WhenReadingNull or JsonIgnoreConditionEx.WhenReadingDefault))
             {
                 throw new ArgumentOutOfRangeException(nameof(value), condition, "Not a read-side condition.");
             }

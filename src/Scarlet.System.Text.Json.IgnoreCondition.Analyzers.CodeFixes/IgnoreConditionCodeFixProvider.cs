@@ -1,8 +1,5 @@
 using System.Collections.Immutable;
 using System.Composition;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CodeActions;
 using Microsoft.CodeAnalysis.CodeFixes;
@@ -64,5 +61,4 @@ public sealed class IgnoreConditionCodeFixProvider : CodeFixProvider
             changed = changed.ReplaceNode(currentMember, currentMember.WithAdditionalAnnotations(Formatter.Annotation));
         return document.WithSyntaxRoot(changed);
     }
-
 }

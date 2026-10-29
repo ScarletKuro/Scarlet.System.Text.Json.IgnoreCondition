@@ -1,7 +1,5 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
-using Xunit;
-using static VerifyXunit.Verifier;
 
 namespace Scarlet.System.Text.Json.IgnoreCondition.Analyzers.Tests;
 
