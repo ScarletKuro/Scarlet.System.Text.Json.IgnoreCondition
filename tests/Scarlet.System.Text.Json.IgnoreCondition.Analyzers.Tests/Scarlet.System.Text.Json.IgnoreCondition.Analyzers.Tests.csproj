@@ -4,8 +4,20 @@
     <OutputType>Exe</OutputType>
     <IsTestProject>true</IsTestProject>
   </PropertyGroup>
+
+  <!-- Verify's maintenance fee (https://github.com/VerifyTests/Verify/blob/main/docs/maintenance-fee.md):
+       this is a non-revenue open source project, which is exempt. The exemption must be time-bounded, at most
+       12 months ahead, so it is always computed as twelve months from the build date. -->
+  <PropertyGroup>
+    <Verify_SponsorshipExemption>OpenSource</Verify_SponsorshipExemption>
+    <Verify_SponsorshipExemptionUntil>$([System.DateTime]::UtcNow.AddMonths(12).ToString('yyyy-MM'))</Verify_SponsorshipExemptionUntil>
+  </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="xunit.v3.aot" />
+    <!-- Regular xunit v3, not the AOT flavour: these tests only run under JIT, and Verify's xunit adapter is
+         built on the regular xunit packages. -->
+    <PackageReference Include="xunit.v3" />
+    <PackageReference Include="Verify.XunitV3" />
+    <PackageReference Include="Verify.SourceGenerators" />
     <PackageReference Include="Microsoft.Testing.Extensions.CodeCoverage" />
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Workspaces" />
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Analyzer.Testing" />

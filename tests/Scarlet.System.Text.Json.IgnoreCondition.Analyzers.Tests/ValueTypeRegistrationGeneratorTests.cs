@@ -1,6 +1,7 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Xunit;
+using static VerifyXunit.Verifier;
 
 namespace Scarlet.System.Text.Json.IgnoreCondition.Analyzers.Tests;
 
@@ -19,10 +20,14 @@ public sealed class ValueTypeRegistrationGeneratorTests
         MetadataReference.CreateFromFile(typeof(JsonIgnoreExAttribute).Assembly.Location),
     ];
 
+    /// <summary>
+    /// Snapshot of the full generated source, in ValueTypeRegistrations#…verified.cs next to this file. Covers an enum, a
+    /// nullable struct, a closed generic struct and a record parameter's property: target.
+    /// </summary>
     [Fact]
-    public void Custom_value_types_of_annotated_members_are_registered()
+    public Task Custom_value_types_of_annotated_members_are_registered()
     {
-        string? generated = Generate(Imports + """
+        GeneratorDriver driver = Run(Imports + """
             namespace App;
 
             public enum Level { Low, High }
@@ -40,12 +45,9 @@ public sealed class ValueTypeRegistrationGeneratorTests
             public sealed record Credentials([property: JsonIgnoreEx(JsonIgnoreConditionEx.WhenReadingNull)] Role Access = Role.Admin);
             """);
 
-        Assert.NotNull(generated);
-        Assert.Contains("RegisterValueType<global::App.Level>();", generated);
-        Assert.Contains("RegisterValueType<global::App.Point>();", generated);
-        Assert.Contains("RegisterValueType<global::App.Wrapper<int>>();", generated);
-        Assert.Contains("RegisterValueType<global::App.Role>();", generated);
-        Assert.Contains("[global::System.Runtime.CompilerServices.ModuleInitializer]", generated);
+        // Named explicitly: the default <class>.<method>#<hint name> file name pushes the full path past
+        // Windows' 260-character limit, which git for Windows refuses to stage.
+        return Verify(driver).UseFileName("ValueTypeRegistrations");
     }
 
     [Fact]
@@ -108,7 +110,10 @@ public sealed class ValueTypeRegistrationGeneratorTests
             LanguageVersion.CSharp8));
     }
 
-    private static string? Generate(string source, LanguageVersion languageVersion = LanguageVersion.Latest)
+    private static string? Generate(string source, LanguageVersion languageVersion = LanguageVersion.Latest) =>
+        Run(source, languageVersion).GetRunResult().GeneratedTrees.SingleOrDefault()?.ToString();
+
+    private static GeneratorDriver Run(string source, LanguageVersion languageVersion = LanguageVersion.Latest)
     {
         var parseOptions = new CSharpParseOptions(languageVersion);
         var compilation = CSharpCompilation.Create(
@@ -126,7 +131,7 @@ public sealed class ValueTypeRegistrationGeneratorTests
         Assert.Empty(output.GetDiagnostics(TestContext.Current.CancellationToken)
             .Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error));
 
-        return driver.GetRunResult().GeneratedTrees.SingleOrDefault()?.ToString();
+        return driver;
     }
 
     private static int Count(string text, string value) =>

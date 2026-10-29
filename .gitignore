@@ -344,3 +344,5 @@ __pycache__/
 
 # Cake - Uncomment if you are using it
 # tools/
+# Verify: results that differ from an approved snapshot, pending review
+*.received.*
