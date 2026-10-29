@@ -86,11 +86,12 @@ Two things to know:
 
 - **A custom enum or struct must be registered** — `ExtendedIgnoreConditionResolver.RegisterValueType<T>()`
   — because projecting the member as `T?` needs a generic instantiation over the member type, and a value
-  type does not share one. The library roots every built-in value type itself (all the integer and
+  type does not share one. The library roots the common primitive value types itself (all the integer and
   floating-point types, `bool`, `char`, `decimal`, `Guid`, `DateTime`, `DateTimeOffset`, `DateOnly`,
   `TimeOnly`, `TimeSpan`, and each of their `Nullable<T>` forms), which costs about 44 rooted
-  instantiations of binary size in exchange for needing no registration in the common cases. Reference
-  types share one canonical instantiation and never need registering.
+  instantiations of binary size in exchange for needing no registration in the common cases. Other value
+  types from .NET itself, such as `DayOfWeek`, `JsonElement` or `BigInteger`, are not rooted and count as
+  custom here. Reference types share one canonical instantiation and never need registering.
 - **The generator only sees `[JsonIgnoreEx]`.** It registers the custom value types of annotated members,
   including `[property:]` targets on positional records, from a module initializer in the assembly that
   declares them; the resolver runs that initializer before it looks a type up, because resolving a

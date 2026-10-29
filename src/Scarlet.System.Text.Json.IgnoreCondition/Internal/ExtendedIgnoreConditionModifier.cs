@@ -234,7 +234,7 @@ internal sealed class ExtendedIgnoreConditionModifier
                 return;
             }
 
-            object? nullReplacement = parameter!.HasDefaultValue ? parameter.DefaultValue : null;
+            object? nullReplacement = parameter!.HasDefaultValue ? NormalizeDefault(parameter.DefaultValue, memberType) : null;
             property.CustomConverter = ops!.CreateDefaultOnNullConverter(
                 property.CustomConverter,
                 nullReplacement,
@@ -351,7 +351,7 @@ internal sealed class ExtendedIgnoreConditionModifier
     private static string MissingOpsReason(Type memberType)
     {
         Type valueType = Nullable.GetUnderlyingType(memberType) ?? memberType;
-        return $"'{valueType}' is a custom value type that has not been registered, and NativeAOT " +
+        return $"'{valueType}' is a value type that has not been registered, and NativeAOT " +
                "cannot create its metadata at run time. Call " +
                $"ExtendedIgnoreConditionResolver.RegisterValueType<{CSharpName(valueType)}>() during startup.";
     }
@@ -361,6 +361,17 @@ internal sealed class ExtendedIgnoreConditionModifier
             ? $"{type.Name[..type.Name.IndexOf('`', StringComparison.Ordinal)]}<" +
               $"{string.Join(", ", type.GetGenericArguments().Select(CSharpName))}>"
             : type.Name;
+
+    /// <summary>
+    /// Reflection reports an enum parameter's default value as its underlying integer. That unboxes to the
+    /// enum itself, but not to <c>Nullable&lt;TEnum&gt;</c>, so convert it to the enum first.
+    /// </summary>
+    private static object? NormalizeDefault(object? value, Type memberType) =>
+        value is not null &&
+        (Nullable.GetUnderlyingType(memberType) ?? memberType) is { IsEnum: true } enumType &&
+        value.GetType() != enumType
+            ? Enum.ToObject(enumType, value)
+            : value;
 
     /// <summary>
     /// Whether the serializer assigns the member through an object initializer instead of its setter. The

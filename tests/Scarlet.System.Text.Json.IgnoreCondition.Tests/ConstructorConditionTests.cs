@@ -130,6 +130,30 @@ public sealed class ConstructorConditionTests
 
     [Theory]
     [MemberData(nameof(Configurations))]
+    public void A_nullable_enum_parameter_falls_back_to_its_default(SerializerConfiguration configuration)
+    {
+        JsonSerializerOptions options = Serializers.Create(configuration);
+
+        Assert.Equal(Season.Autumn, Serializers.Deserialize<NullableEnumParameterRecord>("""{"Season":null}""", options).Season);
+        Assert.Equal(Season.Autumn, Serializers.Deserialize<NullableEnumParameterRecord>("{}", options).Season);
+        Assert.Equal(Season.Spring, Serializers.Deserialize<NullableEnumParameterRecord>("""{"Season":1}""", options).Season);
+    }
+
+    /// <summary>The same parameter reached only by an options-level default, which used to break the whole type.</summary>
+    [Theory]
+    [MemberData(nameof(Configurations))]
+    public void A_default_read_condition_handles_a_nullable_enum_parameter(SerializerConfiguration configuration)
+    {
+        JsonSerializerOptions options = Serializers.Create(
+            configuration,
+            static settings => settings.DefaultReadCondition = JsonIgnoreConditionEx.WhenReadingNull);
+
+        Assert.Equal(Season.Autumn, Serializers.Deserialize<UnannotatedNullableEnumRecord>("{}", options).Season);
+        Assert.Equal(Season.Autumn, Serializers.Deserialize<UnannotatedNullableEnumRecord>("""{"Season":null}""", options).Season);
+    }
+
+    [Theory]
+    [MemberData(nameof(Configurations))]
     public void A_null_constructor_bound_member_is_still_written(SerializerConfiguration configuration)
     {
         string json = Serializers.Serialize(new RecordModel("given", 9, Nickname: null), Serializers.Create(configuration));

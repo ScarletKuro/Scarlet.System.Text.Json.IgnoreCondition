@@ -29,6 +29,22 @@ public sealed class CustomValueTypeTests
         Assert.Equal(json, Serializers.Serialize(assigned, options));
     }
 
+    /// <summary>
+    /// DayOfWeek is not rooted by the library, so this only passes, with RequireValueTypeRegistration and
+    /// under NativeAOT, because the generator registered it for the annotated member.
+    /// </summary>
+    [Theory]
+    [MemberData(nameof(Configurations))]
+    public void A_framework_value_type_is_registered_by_the_generator(SerializerConfiguration configuration)
+    {
+        JsonSerializerOptions options = Serializers.Create(
+            configuration,
+            static settings => settings.RequireValueTypeRegistration = true);
+
+        Assert.Equal(DayOfWeek.Friday, Serializers.Deserialize<FrameworkValueTypeModel>("""{"Day":null}""", options).Day);
+        Assert.Equal(DayOfWeek.Monday, Serializers.Deserialize<FrameworkValueTypeModel>("""{"Day":1}""", options).Day);
+    }
+
     [Theory]
     [MemberData(nameof(Configurations))]
     public void A_struct_with_members_keeps_its_initial_value(SerializerConfiguration configuration)

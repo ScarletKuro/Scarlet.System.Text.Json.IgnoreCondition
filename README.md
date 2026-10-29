@@ -172,7 +172,10 @@ strict check now. Your ordinary tests then report anything missing, with the exa
 new ExtendedIgnoreConditionSettings { RequireValueTypeRegistration = true }
 ```
 
-Built-in types (`int`, `Guid`, `DateTime`, `string` and so on) never need registering.
+Reference types and the common primitives (`int` and the other numeric types, `bool`, `char`, `Guid`,
+`DateTime`, `DateTimeOffset`, `DateOnly`, `TimeOnly`, `TimeSpan`) never need registering. Other value types
+from .NET itself, such as `DayOfWeek` or `JsonElement`, are treated like your own: registered by the
+generator for `[JsonIgnoreEx]` members, and by you otherwise.
 
 ## Analyzer
 

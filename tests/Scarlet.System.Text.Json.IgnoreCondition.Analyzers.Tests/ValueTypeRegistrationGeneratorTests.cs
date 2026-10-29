@@ -224,6 +224,39 @@ public sealed class ValueTypeRegistrationGeneratorTests
         Assert.DoesNotContain("Renamed", generated);
     }
 
+    /// <summary>
+    /// Value types from .NET itself that the runtime library does not root are registered like the user's own.
+    /// Only the rooted primitives (int, Guid, DateTime, ...) are skipped.
+    /// </summary>
+    [Fact]
+    public void Framework_value_types_outside_the_rooted_set_are_registered()
+    {
+        string? generated = Generate(Imports + """
+            using System;
+            using System.Collections.Generic;
+            using System.Numerics;
+            using System.Text.Json;
+
+            public sealed class Model
+            {
+                [JsonIgnoreEx(JsonIgnoreConditionEx.WhenReadingNull)] public DayOfWeek Day { get; set; }
+                [JsonIgnoreEx(JsonIgnoreConditionEx.WhenReadingNull)] public DayOfWeek? OptionalDay { get; set; }
+                [JsonIgnoreEx(JsonIgnoreConditionEx.WhenReadingNull)] public JsonElement Element { get; set; }
+                [JsonIgnoreEx(JsonIgnoreConditionEx.WhenReadingNull)] public BigInteger Big { get; set; }
+                [JsonIgnoreEx(JsonIgnoreConditionEx.WhenReadingNull)] public KeyValuePair<int, string> Pair { get; set; }
+                [JsonIgnoreEx(JsonIgnoreConditionEx.WhenReadingNull)] public Guid Rooted { get; set; }
+            }
+            """);
+
+        Assert.NotNull(generated);
+        Assert.Contains("RegisterValueType<global::System.DayOfWeek>();", generated);
+        Assert.Contains("RegisterValueType<global::System.Text.Json.JsonElement>();", generated);
+        Assert.Contains("RegisterValueType<global::System.Numerics.BigInteger>();", generated);
+        Assert.Contains("RegisterValueType<global::System.Collections.Generic.KeyValuePair<int, string>>();", generated);
+        Assert.Equal(1, Count(generated, "DayOfWeek>"));
+        Assert.DoesNotContain("Guid", generated);
+    }
+
     [Fact]
     public void Nothing_is_generated_without_annotated_members()
     {

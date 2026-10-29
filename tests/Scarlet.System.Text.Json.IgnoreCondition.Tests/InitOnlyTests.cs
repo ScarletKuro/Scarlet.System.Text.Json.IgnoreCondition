@@ -40,7 +40,11 @@ public sealed class InitOnlyTests
         }
     }
 
-    /// <summary>An options-level default is best-effort: under source generation it leaves init-only members native.</summary>
+    /// <summary>
+    /// An options-level default is best-effort: under source generation it leaves init-only members native.
+    /// That includes a non-nullable value type, which must not be re-declared as T? there: the generated
+    /// initializer binds it by its declared type, and every deserialization of the type would fail.
+    /// </summary>
     [Theory]
     [MemberData(nameof(Configurations))]
     public void An_options_level_default_does_not_throw_on_init_only_members(SerializerConfiguration configuration)
@@ -49,8 +53,10 @@ public sealed class InitOnlyTests
             configuration,
             static settings => settings.DefaultReadCondition = JsonIgnoreConditionEx.WhenReadingNull);
 
-        UnannotatedInitOnlyModel model = Serializers.Deserialize<UnannotatedInitOnlyModel>("""{"Name":null}""", options);
+        UnannotatedInitOnlyModel model = Serializers.Deserialize<UnannotatedInitOnlyModel>(
+            """{"Name":null,"Count":5}""", options);
 
         Assert.Equal(configuration == SerializerConfiguration.Reflection ? "initial" : null, model.Name);
+        Assert.Equal(5, model.Count);
     }
 }

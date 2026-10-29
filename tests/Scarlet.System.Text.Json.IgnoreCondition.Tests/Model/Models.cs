@@ -427,7 +427,19 @@ public sealed class InitOnlyModel
 public sealed class UnannotatedInitOnlyModel
 {
     public string? Name { get; init; } = "initial";
+
+    /// <summary>A non-nullable value type: re-declaring it as T? would break the generated initializer binding.</summary>
+    public int Count { get; init; } = 3;
 }
+
+/// <summary>
+/// Nullable-enum constructor parameters with a default. Reflection reports that default as the underlying
+/// integer, which does not unbox to <c>Season?</c>.
+/// </summary>
+public sealed record NullableEnumParameterRecord(
+    [property: JsonIgnoreEx(JsonIgnoreConditionEx.WhenReadingNull)] Season? Season = Season.Autumn);
+
+public sealed record UnannotatedNullableEnumRecord(Season? Season = Season.Autumn);
 
 /// <summary>A converter that reads and writes JSON null itself (HandleNull), as a sentinel.</summary>
 public sealed class NullAsTextConverter : JsonConverter<string?>
@@ -498,6 +510,13 @@ public sealed class UnregisteredNullableValueTypeModel
 public enum ManualOnly
 {
     A,
+}
+
+/// <summary>A .NET value type outside the library's rooted set: registered by the generator, like a user enum.</summary>
+public sealed class FrameworkValueTypeModel
+{
+    [JsonIgnoreEx(JsonIgnoreConditionEx.WhenReadingNull)]
+    public DayOfWeek Day { get; set; } = DayOfWeek.Friday;
 }
 
 public sealed class CustomValueTypeModel
