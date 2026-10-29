@@ -94,8 +94,8 @@ Two things to know:
   including `[property:]` targets on positional records, from a module initializer in the assembly that
   declares them; the resolver runs that initializer before it looks a type up, because resolving a
   contract alone does not. It cannot see members reached only by `DefaultReadCondition`, members typed
-  as a generic type parameter, types inaccessible from generated code (such as a `private` nested enum),
-  or projects compiled below C# 9. Register those manually.
+  as a generic type parameter, types inaccessible from generated code (such as a `private` nested enum or
+  a file-local type), or projects compiled below C# 9. Register those manually.
   `ExtendedIgnoreConditionSettings.RequireValueTypeRegistration = true` makes JIT runs refuse them as a
   native build would.
 - **A missing registration is reported even for `DefaultReadCondition`.** Other members an options-level

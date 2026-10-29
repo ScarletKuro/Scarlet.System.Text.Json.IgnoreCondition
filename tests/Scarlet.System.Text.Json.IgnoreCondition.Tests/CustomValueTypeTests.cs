@@ -15,6 +15,22 @@ public sealed class CustomValueTypeTests
 
     [Theory]
     [MemberData(nameof(Configurations))]
+    public void Closed_array_arguments_are_registered_and_round_trip(SerializerConfiguration configuration)
+    {
+        JsonSerializerOptions options = Serializers.Create(configuration,
+            static settings => settings.RequireValueTypeRegistration = true);
+
+        ArrayArgumentModel skipped = Serializers.Deserialize<ArrayArgumentModel>("""{"Box":null}""", options)!;
+        Assert.Equal([1, 2], skipped.Box.Value);
+
+        const string json = """{"Box":{"Value":[3,4]}}""";
+        ArrayArgumentModel assigned = Serializers.Deserialize<ArrayArgumentModel>(json, options)!;
+        Assert.Equal([3, 4], assigned.Box.Value);
+        Assert.Equal(json, Serializers.Serialize(assigned, options));
+    }
+
+    [Theory]
+    [MemberData(nameof(Configurations))]
     public void A_struct_with_members_keeps_its_initial_value(SerializerConfiguration configuration)
     {
         JsonSerializerOptions options = Serializers.Create(configuration);

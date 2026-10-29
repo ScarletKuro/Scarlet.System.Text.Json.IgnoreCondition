@@ -125,6 +125,77 @@ public sealed class ValueTypeRegistrationGeneratorTests
     }
 
     [Fact]
+    public void Closed_array_type_arguments_can_be_registered()
+    {
+        string? generated = Generate(Imports + """
+            public readonly record struct Wrapper<T>(T Value);
+            public sealed class Model
+            {
+                [JsonIgnoreEx(JsonIgnoreConditionEx.WhenReadingNull)] public Wrapper<int[]> Vector { get; set; }
+                [JsonIgnoreEx(JsonIgnoreConditionEx.WhenReadingDefault)] public Wrapper<string[][]> Jagged { get; set; }
+                [JsonIgnoreEx(JsonIgnoreConditionEx.WhenReadingNull)] public Wrapper<int[,]> Matrix { get; set; }
+                [JsonIgnoreEx(JsonIgnoreConditionEx.WhenReadingNull)] public Wrapper<dynamic[]> Dynamic { get; set; }
+            }
+            """);
+
+        Assert.NotNull(generated);
+        Assert.Contains("RegisterValueType<global::Wrapper<int[]>>", generated);
+        Assert.Contains("RegisterValueType<global::Wrapper<string[][]>>", generated);
+        Assert.Contains("RegisterValueType<global::Wrapper<int[,]>>", generated);
+        Assert.Contains("RegisterValueType<global::Wrapper<dynamic[]>>", generated);
+    }
+
+    [Fact]
+    public void Open_and_file_local_array_arguments_cannot_be_registered()
+    {
+        string? generated = Generate(Imports + """
+            public readonly record struct Wrapper<T>(T Value);
+            public sealed class GenericModel<T>
+            {
+                [JsonIgnoreEx(JsonIgnoreConditionEx.WhenReadingNull)] public Wrapper<T[]> Value { get; set; }
+            }
+            file enum Hidden { A }
+            file sealed class LocalModel
+            {
+                [JsonIgnoreEx(JsonIgnoreConditionEx.WhenReadingNull)] public Wrapper<Hidden[]> Value { get; set; }
+            }
+            """);
+
+        Assert.Null(generated);
+    }
+
+    [Fact]
+    public void Private_generic_arguments_cannot_be_registered()
+    {
+        string? generated = Generate(Imports + """
+            public readonly record struct Wrapper<T>(T Value);
+            public sealed class Model
+            {
+                private enum Hidden { A }
+                [JsonIgnoreEx(JsonIgnoreConditionEx.WhenReadingNull)] private Wrapper<Hidden> Value { get; set; }
+            }
+            """);
+
+        Assert.Null(generated);
+    }
+
+    [Fact]
+    public void Ref_structs_cannot_be_registered_as_generic_type_arguments()
+    {
+        string? generated = Generate(Imports + """
+            using System.Text.Json.Serialization;
+            public ref struct RefValue { }
+            public sealed class Model
+            {
+                [JsonIgnore]
+                [JsonIgnoreEx(JsonIgnoreConditionEx.WhenReadingNull)] public RefValue Value => default;
+            }
+            """);
+
+        Assert.Null(generated);
+    }
+
+    [Fact]
     public void Nothing_is_generated_without_annotated_members()
     {
         Assert.Null(Generate("public enum Level { Low, High } public sealed class Model { public Level Level { get; set; } }"));

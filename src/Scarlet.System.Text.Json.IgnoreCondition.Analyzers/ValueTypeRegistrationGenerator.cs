@@ -85,6 +85,7 @@ public sealed class ValueTypeRegistrationGenerator : IIncrementalGenerator
             type = nullable.TypeArguments[0];
 
         if (type is not INamedTypeSymbol { TypeKind: TypeKind.Struct or TypeKind.Enum } named ||
+            named.IsRefLikeType ||
             named.SpecialType != SpecialType.None ||
             RootedTypes.Contains(named.ToDisplayString()) ||
             !CanBeNamedFromGeneratedCode(named) ||
@@ -98,18 +99,28 @@ public sealed class ValueTypeRegistrationGenerator : IIncrementalGenerator
     /// Whether the generated file can spell the type: it must be closed, and neither it, a type containing
     /// it, nor any of its type arguments may be file-local. Assembly accessibility is not enough, because a
     /// file-local type is visible only inside the file that declares it (CS0400 elsewhere).
+    /// Array arguments are closed and nameable when their element type is.
     /// </summary>
-    private static bool CanBeNamedFromGeneratedCode(INamedTypeSymbol type)
+    private static bool CanBeNamedFromGeneratedCode(ITypeSymbol type)
     {
-        for (var current = type; current is not null; current = current.ContainingType)
+        if (type is IArrayTypeSymbol array)
+            return CanBeNamedFromGeneratedCode(array.ElementType);
+
+        // dynamic is emitted as a valid C# type argument and has the metadata identity of object.
+        if (type is IDynamicTypeSymbol)
+            return true;
+
+        if (type is not INamedTypeSymbol named)
+            return false;
+
+        for (var current = named; current is not null; current = current.ContainingType)
         {
             if (current.IsFileLocal)
                 return false;
 
             foreach (var argument in current.TypeArguments)
             {
-                if (argument is ITypeParameterSymbol or IArrayTypeSymbol or IPointerTypeSymbol or IFunctionPointerTypeSymbol ||
-                    argument is INamedTypeSymbol namedArgument && !CanBeNamedFromGeneratedCode(namedArgument))
+                if (!CanBeNamedFromGeneratedCode(argument))
                     return false;
             }
         }

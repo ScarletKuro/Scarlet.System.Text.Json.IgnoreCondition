@@ -389,6 +389,18 @@ public sealed record ConverterFactoryRecord(
     [property: JsonConverter(typeof(JsonStringEnumConverter<Season>))]
     Season Season = Season.Autumn);
 
+public sealed record ObjectPayloadModel(
+    object First,
+    [property: JsonIgnoreEx(JsonIgnoreConditionEx.WhenReadingNull)] object? Payload = null);
+
+public readonly record struct ArrayBox<T>(T Value);
+
+public sealed class ArrayArgumentModel
+{
+    [JsonIgnoreEx(JsonIgnoreConditionEx.WhenReadingNull)]
+    public ArrayBox<int[]> Box { get; set; } = new([1, 2]);
+}
+
 /// <summary>A user enum that is deliberately never registered, not even for the NativeAOT run.</summary>
 public enum Shade
 {

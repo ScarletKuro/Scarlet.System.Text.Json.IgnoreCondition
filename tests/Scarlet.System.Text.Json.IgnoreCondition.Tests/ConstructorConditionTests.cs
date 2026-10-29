@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using Xunit;
 
 namespace Scarlet.System.Text.Json.IgnoreCondition.Tests;
@@ -10,6 +11,32 @@ namespace Scarlet.System.Text.Json.IgnoreCondition.Tests;
 public sealed class ConstructorConditionTests
 {
     public static TheoryData<SerializerConfiguration> Configurations => ReadConditionTests.Configurations;
+
+    [Theory]
+    [MemberData(nameof(Configurations))]
+    public void Object_parameters_are_refused_on_both_read_and_write(SerializerConfiguration configuration)
+    {
+        Assert.Throws<NotSupportedException>(() => Serializers.Serialize(
+            new ObjectPayloadModel(1, 2), Serializers.Create(configuration)));
+        Assert.Throws<NotSupportedException>(() => Serializers.Deserialize<ObjectPayloadModel>(
+            """{"First":1,"Payload":null}""", Serializers.Create(configuration)));
+    }
+
+    [Theory]
+    [MemberData(nameof(Configurations))]
+    public void Skipping_an_unsupported_object_condition_preserves_native_behavior(SerializerConfiguration configuration)
+    {
+        JsonSerializerOptions options = Serializers.Create(configuration,
+            static settings => settings.UnsupportedMemberBehavior = UnsupportedMemberBehavior.Skip,
+            static options => options.ReferenceHandler = ReferenceHandler.Preserve);
+
+        using JsonDocument json = JsonDocument.Parse(Serializers.Serialize(new ObjectPayloadModel(1, 2), options));
+        Assert.Equal(2, json.RootElement.GetProperty("Payload").GetInt32());
+
+        ObjectPayloadModel model = Serializers.Deserialize<ObjectPayloadModel>(
+            """{"First":{"$id":"1","Value":2},"Payload":{"$ref":"1"}}""", options)!;
+        Assert.Same(model.First, model.Payload);
+    }
 
     [Theory]
     [MemberData(nameof(Configurations))]
