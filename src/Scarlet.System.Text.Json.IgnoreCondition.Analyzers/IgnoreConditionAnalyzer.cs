@@ -43,7 +43,9 @@ public sealed partial class IgnoreConditionAnalyzer : DiagnosticAnalyzer
         {
             if (SymbolEqualityComparer.Default.Equals(attribute.AttributeClass, extendedType))
             {
-                if (attribute.ConstructorArguments is [{ Value: int value and (0 or 1) } _])
+                // No list pattern here: netstandard2.0 has no System.Index, which list patterns require.
+                if (attribute.ConstructorArguments.Length == 1 &&
+                    attribute.ConstructorArguments[0].Value is int value and (0 or 1))
                 {
                     extended.Add((attribute, value == 0 ? "WhenReadingNull" : "WhenReadingDefault"));
                 }
@@ -66,19 +68,13 @@ public sealed partial class IgnoreConditionAnalyzer : DiagnosticAnalyzer
             return;
         }
 
-        DiagnosticDescriptor descriptor;
-        if (IgnoreConditionRules.NativeConflictsWithExtended(nativeCondition))
-        {
-            descriptor = Conflict;
-        }
-        else if (IgnoreConditionRules.NativeMasksExtended(nativeCondition))
-        {
-            descriptor = Ineffective;
-        }
-        else
+        bool conflicts = IgnoreConditionRules.NativeConflictsWithExtended(nativeCondition);
+        if (!conflicts && !IgnoreConditionRules.NativeMasksExtended(nativeCondition))
         {
             return;
         }
+
+        DiagnosticDescriptor descriptor = conflicts ? Conflict : Ineffective;
 
         var nativeSyntax = native.ApplicationSyntaxReference?.GetSyntax(context.CancellationToken);
         if (nativeSyntax is null)
@@ -94,7 +90,7 @@ public sealed partial class IgnoreConditionAnalyzer : DiagnosticAnalyzer
                 continue;
             }
 
-            object[] arguments = descriptor == Conflict ? [context.Symbol.Name, item.Condition] : [context.Symbol.Name];
+            object[] arguments = conflicts ? [context.Symbol.Name, item.Condition] : [context.Symbol.Name];
             context.ReportDiagnostic(Diagnostic.Create(descriptor, syntax.GetLocation(),
                 additionalLocations: [nativeSyntax.GetLocation()],
                 properties: ImmutableDictionary<string, string?>.Empty
