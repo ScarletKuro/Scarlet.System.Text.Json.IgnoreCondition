@@ -94,6 +94,36 @@ public sealed class ValueTypeRegistrationGeneratorTests
         Assert.Null(generated);
     }
 
+    /// <summary>
+    /// A file-local type is accessible within the assembly but not from the generated file, so naming it
+    /// there would be CS0400. That holds for the type itself, for a type nested inside a file-local type,
+    /// and for a file-local type used as a generic argument. Generate() fails on any compile error.
+    /// </summary>
+    [Fact]
+    public void File_local_types_are_not_registered()
+    {
+        string? generated = Generate(Imports + """
+            public readonly record struct Wrapper<T>(T Value);
+
+            file enum Hidden { A }
+
+            file sealed class Outer
+            {
+                public enum Nested { A }
+            }
+
+            file sealed class Model
+            {
+                [JsonIgnoreEx(JsonIgnoreConditionEx.WhenReadingNull)] public Hidden Direct { get; set; }
+                [JsonIgnoreEx(JsonIgnoreConditionEx.WhenReadingNull)] public Hidden? Optional { get; set; }
+                [JsonIgnoreEx(JsonIgnoreConditionEx.WhenReadingNull)] public Outer.Nested Nested { get; set; }
+                [JsonIgnoreEx(JsonIgnoreConditionEx.WhenReadingNull)] public Wrapper<Hidden> Wrapped { get; set; }
+            }
+            """);
+
+        Assert.Null(generated);
+    }
+
     [Fact]
     public void Nothing_is_generated_without_annotated_members()
     {

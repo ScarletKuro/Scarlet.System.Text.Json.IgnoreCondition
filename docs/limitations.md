@@ -38,7 +38,9 @@ path never calls a setter. Consequences:
   `string` and friends, or a type with its own member-level converter. For an object or collection
   parameter the interception would have to forward the read through `JsonConverter<T>.Read`, which spins
   up a fresh internal read stack and would silently drop reference handling, polymorphic metadata and the
-  ability to resume a partially buffered read. The library refuses instead of being quietly wrong.
+  ability to resume a partially buffered read. The library refuses instead of being quietly wrong. That
+  includes `object`: it is serialized polymorphically by runtime type, which a direct converter call
+  bypasses, so a boxed `2` would be written as `{}`.
 - **Non-default `JsonNumberHandling` on a numeric parameter is refused**: the number-handling logic lives
   in the serializer's internal converters, and a member-level converter override does not inherit it.
 - A parameter with no default falls back to `default(T)`, since there is no other value to substitute.

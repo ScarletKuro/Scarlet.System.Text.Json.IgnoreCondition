@@ -24,12 +24,15 @@ namespace Scarlet.System.Text.Json.IgnoreCondition.Internal;
 /// </remarks>
 internal static class ConverterBasedTypes
 {
+    // Deliberately not object: it is serialized polymorphically. The serializer dispatches on the runtime
+    // type and resolves $ref, and calling the object converter directly bypasses both (a boxed 2 is
+    // written as {}).
     private static readonly HashSet<Type> KnownValueTypes =
     [
         typeof(bool), typeof(byte), typeof(sbyte), typeof(char), typeof(decimal), typeof(double),
         typeof(float), typeof(short), typeof(ushort), typeof(int), typeof(uint), typeof(long),
         typeof(ulong), typeof(Half), typeof(Int128), typeof(UInt128), typeof(BigInteger),
-        typeof(string), typeof(object),
+        typeof(string),
         typeof(DateTime), typeof(DateTimeOffset), typeof(DateOnly), typeof(TimeOnly),
         typeof(TimeSpan), typeof(Guid), typeof(Uri), typeof(Version),
         typeof(JsonElement), typeof(JsonDocument), typeof(JsonNode), typeof(JsonValue),

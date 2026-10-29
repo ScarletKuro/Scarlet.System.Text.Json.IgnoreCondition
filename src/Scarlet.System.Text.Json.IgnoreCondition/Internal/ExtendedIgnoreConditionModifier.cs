@@ -166,6 +166,25 @@ internal sealed class ExtendedIgnoreConditionModifier
                 Refuse(isExplicit: true, typeInfo, property, MissingOpsReason(memberType));
                 return;
             }
+
+            // Both typed mechanisms wrap the member's converter, so they need the converter itself. The
+            // reflection resolver leaves a member-level factory in CustomConverter (the source generator
+            // emits the converter it creates), so expand it here as the serializer would.
+            if (property.CustomConverter is JsonConverterFactory factory)
+            {
+                JsonConverter? created = factory.CreateConverter(memberType, typeInfo.Options);
+                if (created is null or JsonConverterFactory)
+                {
+                    Refuse(
+                        isExplicit,
+                        typeInfo,
+                        property,
+                        $"its converter factory '{factory.GetType()}' did not create a converter for '{memberType}'.");
+                    return;
+                }
+
+                property.CustomConverter = created;
+            }
         }
 
         if (isConstructorBound)

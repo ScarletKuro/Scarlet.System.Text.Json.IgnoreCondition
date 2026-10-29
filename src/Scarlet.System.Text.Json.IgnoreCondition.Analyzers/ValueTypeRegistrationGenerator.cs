@@ -87,27 +87,34 @@ public sealed class ValueTypeRegistrationGenerator : IIncrementalGenerator
         if (type is not INamedTypeSymbol { TypeKind: TypeKind.Struct or TypeKind.Enum } named ||
             named.SpecialType != SpecialType.None ||
             RootedTypes.Contains(named.ToDisplayString()) ||
-            ContainsTypeParameters(named) ||
+            !CanBeNamedFromGeneratedCode(named) ||
             !compilation.IsSymbolAccessibleWithin(named, compilation.Assembly))
             return null;
 
         return named.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
     }
 
-    private static bool ContainsTypeParameters(INamedTypeSymbol type)
+    /// <summary>
+    /// Whether the generated file can spell the type: it must be closed, and neither it, a type containing
+    /// it, nor any of its type arguments may be file-local. Assembly accessibility is not enough, because a
+    /// file-local type is visible only inside the file that declares it (CS0400 elsewhere).
+    /// </summary>
+    private static bool CanBeNamedFromGeneratedCode(INamedTypeSymbol type)
     {
         for (var current = type; current is not null; current = current.ContainingType)
         {
+            if (current.IsFileLocal)
+                return false;
+
             foreach (var argument in current.TypeArguments)
             {
-                if (argument is ITypeParameterSymbol ||
-                    argument is INamedTypeSymbol namedArgument && ContainsTypeParameters(namedArgument) ||
-                    argument is IArrayTypeSymbol or IPointerTypeSymbol or IFunctionPointerTypeSymbol)
-                    return true;
+                if (argument is ITypeParameterSymbol or IArrayTypeSymbol or IPointerTypeSymbol or IFunctionPointerTypeSymbol ||
+                    argument is INamedTypeSymbol namedArgument && !CanBeNamedFromGeneratedCode(namedArgument))
+                    return false;
             }
         }
 
-        return false;
+        return true;
     }
 
     private static bool CanEmit(Compilation compilation) =>

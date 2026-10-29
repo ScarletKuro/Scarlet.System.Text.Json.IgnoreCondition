@@ -373,6 +373,22 @@ public enum Priority
     High,
 }
 
+/// <summary>
+/// Member-level converter factories. The reflection resolver leaves the factory itself in
+/// <c>CustomConverter</c>, where the source generator emits the converter it creates.
+/// </summary>
+public sealed class ConverterFactoryModel
+{
+    [JsonIgnoreEx(JsonIgnoreConditionEx.WhenReadingNull)]
+    [JsonConverter(typeof(JsonStringEnumConverter<Season>))]
+    public Season Season { get; set; } = Season.Autumn;
+}
+
+public sealed record ConverterFactoryRecord(
+    [property: JsonIgnoreEx(JsonIgnoreConditionEx.WhenReadingNull)]
+    [property: JsonConverter(typeof(JsonStringEnumConverter<Season>))]
+    Season Season = Season.Autumn);
+
 /// <summary>A user enum that is deliberately never registered, not even for the NativeAOT run.</summary>
 public enum Shade
 {

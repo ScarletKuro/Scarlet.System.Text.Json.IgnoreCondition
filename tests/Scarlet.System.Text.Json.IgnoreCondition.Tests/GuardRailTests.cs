@@ -38,6 +38,9 @@ public sealed class GuardRailTests
     public sealed record ComplexParameterModel(
         [property: JsonIgnoreEx(JsonIgnoreConditionEx.WhenReadingNull)] List<string> Values);
 
+    public sealed record ObjectParameterModel(
+        [property: JsonIgnoreEx(JsonIgnoreConditionEx.WhenReadingNull)] object? Payload = null);
+
     public sealed record NumberHandlingParameterModel(
         [property: JsonIgnoreEx(JsonIgnoreConditionEx.WhenReadingNull)]
         [property: JsonNumberHandling(JsonNumberHandling.AllowReadingFromString)] int Count = 3);
@@ -77,6 +80,20 @@ public sealed class GuardRailTests
     {
         NotSupportedException error = Assert.Throws<NotSupportedException>(() =>
             Deserialize<ComplexParameterModel>("""{"Values":null}"""));
+
+        Assert.Contains("single-token converter", error.Message);
+    }
+
+    /// <summary>
+    /// <c>object</c> is serialized polymorphically: the serializer dispatches on the runtime type and resolves
+    /// <c>$ref</c>s. A wrapping converter calls the object converter directly, which bypasses both and would
+    /// write a boxed <c>2</c> as <c>{}</c>, so the condition is refused rather than losing data.
+    /// </summary>
+    [Fact]
+    public void A_constructor_parameter_of_type_object_is_refused()
+    {
+        NotSupportedException error = Assert.Throws<NotSupportedException>(() =>
+            Deserialize<ObjectParameterModel>("""{"Payload":null}"""));
 
         Assert.Contains("single-token converter", error.Message);
     }
