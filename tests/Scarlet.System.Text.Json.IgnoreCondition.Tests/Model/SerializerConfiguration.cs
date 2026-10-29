@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.Json.Serialization.Metadata;
+using Xunit;
 
 namespace Scarlet.System.Text.Json.IgnoreCondition.Tests;
 
@@ -110,13 +111,22 @@ public static class Serializers
     // members of those types carry [JsonIgnoreEx]. The NativeAOT run depends on that.
 
     // Use explicit contracts even for the managed run. The selected resolver still determines
-    // whether those contracts come from reflection or source generation.
-    public static T? Deserialize<T>(string json, JsonSerializerOptions options) =>
-        JsonSerializer.Deserialize(json, TypeInfo<T>(options));
+    // whether those contracts come from reflection or source generation. Every test payload is an
+    // object, so a null result is itself a failure.
+    public static T Deserialize<T>(string json, JsonSerializerOptions options)
+    {
+        T? value = JsonSerializer.Deserialize(json, TypeInfo<T>(options));
+        Assert.NotNull(value);
+        return value;
+    }
 
-    public static ValueTask<T?> DeserializeAsync<T>(
-        Stream stream, JsonSerializerOptions options, CancellationToken cancellationToken = default) =>
-        JsonSerializer.DeserializeAsync(stream, TypeInfo<T>(options), cancellationToken);
+    public static async ValueTask<T> DeserializeAsync<T>(
+        Stream stream, JsonSerializerOptions options, CancellationToken cancellationToken = default)
+    {
+        T? value = await JsonSerializer.DeserializeAsync(stream, TypeInfo<T>(options), cancellationToken);
+        Assert.NotNull(value);
+        return value;
+    }
 
     public static string Serialize<T>(T value, JsonSerializerOptions options) =>
         JsonSerializer.Serialize(value, TypeInfo<T>(options));

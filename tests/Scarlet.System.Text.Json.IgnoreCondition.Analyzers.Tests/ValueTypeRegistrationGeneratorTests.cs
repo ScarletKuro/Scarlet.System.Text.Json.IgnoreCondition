@@ -10,13 +10,19 @@ public sealed class ValueTypeRegistrationGeneratorTests
 
         """;
 
-    private static readonly MetadataReference[] References =
-    [
-        .. ((string)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES")!)
-            .Split(Path.PathSeparator)
-            .Select(static path => MetadataReference.CreateFromFile(path)),
-        MetadataReference.CreateFromFile(typeof(JsonIgnoreExAttribute).Assembly.Location),
-    ];
+    private static readonly MetadataReference[] References = CreateReferences();
+
+    private static MetadataReference[] CreateReferences()
+    {
+        string? platformAssemblies = AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES") as string;
+        Assert.NotNull(platformAssemblies);
+
+        return
+        [
+            .. platformAssemblies.Split(Path.PathSeparator).Select(static path => MetadataReference.CreateFromFile(path)),
+            MetadataReference.CreateFromFile(typeof(JsonIgnoreExAttribute).Assembly.Location),
+        ];
+    }
 
     /// <summary>
     /// Snapshot of the full generated source, in ValueTypeRegistrations#…verified.cs next to this file. Covers an enum, a

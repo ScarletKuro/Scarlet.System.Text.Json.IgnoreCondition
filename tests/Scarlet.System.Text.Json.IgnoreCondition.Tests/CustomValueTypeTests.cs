@@ -20,11 +20,11 @@ public sealed class CustomValueTypeTests
         JsonSerializerOptions options = Serializers.Create(configuration,
             static settings => settings.RequireValueTypeRegistration = true);
 
-        ArrayArgumentModel skipped = Serializers.Deserialize<ArrayArgumentModel>("""{"Box":null}""", options)!;
+        ArrayArgumentModel skipped = Serializers.Deserialize<ArrayArgumentModel>("""{"Box":null}""", options);
         Assert.Equal([1, 2], skipped.Box.Value);
 
         const string json = """{"Box":{"Value":[3,4]}}""";
-        ArrayArgumentModel assigned = Serializers.Deserialize<ArrayArgumentModel>(json, options)!;
+        ArrayArgumentModel assigned = Serializers.Deserialize<ArrayArgumentModel>(json, options);
         Assert.Equal([3, 4], assigned.Box.Value);
         Assert.Equal(json, Serializers.Serialize(assigned, options));
     }
@@ -37,7 +37,7 @@ public sealed class CustomValueTypeTests
 
         CustomValueTypeModel model = Serializers.Deserialize<CustomValueTypeModel>(
             """{"Location":null,"Priority":null}""",
-            options)!;
+            options);
 
         Assert.Equal(new Point(3, 4), model.Location);
         Assert.Equal(Priority.High, model.Priority);
@@ -51,7 +51,7 @@ public sealed class CustomValueTypeTests
 
         CustomValueTypeModel model = Serializers.Deserialize<CustomValueTypeModel>(
             """{"Location":{"X":7,"Y":8},"Priority":0}""",
-            options)!;
+            options);
 
         Assert.Equal(new Point(7, 8), model.Location);
         Assert.Equal(Priority.Low, model.Priority);

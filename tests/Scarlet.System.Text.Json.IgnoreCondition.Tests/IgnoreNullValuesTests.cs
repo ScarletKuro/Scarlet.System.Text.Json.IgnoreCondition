@@ -23,7 +23,7 @@ public sealed class IgnoreNullValuesTests
     {
         JsonSerializerOptions options = WithIgnoreNullValues(configuration);
 
-        IgnoreNullValuesModel model = Serializers.Deserialize<IgnoreNullValuesModel>(AllNulls, options)!;
+        IgnoreNullValuesModel model = Serializers.Deserialize<IgnoreNullValuesModel>(AllNulls, options);
 
         Assert.Equal("initial", model.Name);
         Assert.Equal(["a"], model.Values);
@@ -48,7 +48,7 @@ public sealed class IgnoreNullValuesTests
 
         IgnoreNullValuesModel model = Serializers.Deserialize<IgnoreNullValuesModel>(
             AllNulls.Replace("{", """{"Count":null,""", StringComparison.Ordinal),
-            options)!;
+            options);
 
         Assert.Equal("initial", model.Name);
         Assert.Equal(["a"], model.Values);
@@ -60,7 +60,7 @@ public sealed class IgnoreNullValuesTests
 
         IgnoreNullValuesRecord record = Serializers.Deserialize<IgnoreNullValuesRecord>(
             """{"Name":null,"Age":null}""",
-            options)!;
+            options);
 
         Assert.Equal("unknown", record.Name);
         Assert.Equal(41, record.Age);

@@ -84,17 +84,21 @@ internal abstract class MemberOps
         bool replaceTypeDefaults);
 
     /// <summary>
-    /// Creates a replacement contract entry of type <c>T?</c> for the same JSON name, or
-    /// <see langword="null"/> when the member declares a converter that cannot be lifted over
-    /// <see cref="Nullable{T}"/>.
+    /// Creates a replacement contract entry of type <c>T?</c> for the same JSON name.
     /// </summary>
     /// <remarks>
+    /// <para>
+    /// The member's converter, if any, must already be a converter for <c>T</c>: the modifier expands
+    /// factories and refuses converters for any other type before calling this.
+    /// </para>
+    /// <para>
     /// Deliberately built through <see cref="JsonMetadataServices"/> rather than
     /// <see cref="JsonTypeInfo.CreateJsonPropertyInfo"/>: the latter instantiates
     /// <c>JsonPropertyInfo&lt;T?&gt;</c> reflectively, which a NativeAOT build has no guarantee of
     /// having pre-generated.
+    /// </para>
     /// </remarks>
-    public virtual JsonPropertyInfo? CreateNullableProjection(JsonTypeInfo declaringTypeInfo, JsonPropertyInfo source) =>
+    public virtual JsonPropertyInfo CreateNullableProjection(JsonTypeInfo declaringTypeInfo, JsonPropertyInfo source) =>
         throw new InvalidOperationException($"'{MemberType}' is not a non-nullable value type.");
 
     /// <summary>
@@ -178,28 +182,16 @@ internal sealed class ValueMemberOps<T> : MemberOps<T>
 
     public override bool SupportsNullableProjection => true;
 
-    public override JsonPropertyInfo? CreateNullableProjection(JsonTypeInfo declaringTypeInfo, JsonPropertyInfo source)
+    public override JsonPropertyInfo CreateNullableProjection(JsonTypeInfo declaringTypeInfo, JsonPropertyInfo source)
     {
         JsonSerializerOptions options = declaringTypeInfo.Options;
-        JsonConverter<T?> converter;
 
-        if (source.CustomConverter is { } memberConverter)
-        {
-            if (memberConverter is not JsonConverter<T> typedConverter)
-            {
-                // A factory or otherwise untyped converter cannot be lifted; refuse rather than
-                // silently drop the member's converter.
-                return null;
-            }
+        JsonConverter<T?> converter = source.CustomConverter is JsonConverter<T> memberConverter
+            ? new NullableWrapConverter<T>(memberConverter)
 
-            converter = new NullableWrapConverter<T>(typedConverter);
-        }
-        else
-        {
             // The serializer's own Nullable<T> converter, so a complex struct keeps full fidelity
             // (reference handling, resumable reads) rather than being read through a shim.
-            converter = JsonMetadataServices.GetNullableConverter<T>(options);
-        }
+            : JsonMetadataServices.GetNullableConverter<T>(options);
 
         return JsonMetadataServices.CreatePropertyInfo(
             options,

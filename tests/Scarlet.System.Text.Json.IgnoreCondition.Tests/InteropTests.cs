@@ -24,16 +24,16 @@ public sealed class InteropTests
         });
 
         NonNullableReferenceModel reference = Serializers.Deserialize<NonNullableReferenceModel>(
-            """{"Name":null,"Values":null,"Field":null}""", options)!;
+            """{"Name":null,"Values":null,"Field":null}""", options);
         Assert.Equal("initial", reference.Name);
         Assert.Equal(["initial"], reference.Values);
         Assert.Equal("initial", reference.Field);
 
-        RecordModel record = Serializers.Deserialize<RecordModel>("""{"Name":null,"Age":null}""", options)!;
+        RecordModel record = Serializers.Deserialize<RecordModel>("""{"Name":null,"Age":null}""", options);
         Assert.Equal("unknown", record.Name);
         Assert.Equal(41, record.Age);
 
-        ValueModel value = Serializers.Deserialize<ValueModel>("""{"Age":null,"Season":null}""", options)!;
+        ValueModel value = Serializers.Deserialize<ValueModel>("""{"Age":null,"Season":null}""", options);
         Assert.Equal(41, value.Age);
         Assert.Equal(Season.Summer, value.Season);
         value.Age = 0;
@@ -71,7 +71,9 @@ public sealed class InteropTests
     {
         JsonSerializerOptions options = Serializers.CreateUnmodified(configuration);
         options.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingDefault;
-        options.TypeInfoResolver = new ExtendedIgnoreConditionResolver(options.TypeInfoResolver!.WithAddedModifier(static info =>
+        IJsonTypeInfoResolver? baseResolver = options.TypeInfoResolver;
+        Assert.NotNull(baseResolver);
+        options.TypeInfoResolver = new ExtendedIgnoreConditionResolver(baseResolver.WithAddedModifier(static info =>
         {
             foreach (var property in info.Properties)
             {
@@ -95,7 +97,7 @@ public sealed class InteropTests
             configureOptions: static o => o.RespectNullableAnnotations = true);
 
         NonNullableReferenceModel model = Serializers.Deserialize<NonNullableReferenceModel>(
-            """{"Name":null,"Values":null,"Field":null}""", options)!;
+            """{"Name":null,"Values":null,"Field":null}""", options);
         Assert.Equal("initial", model.Name);
         Assert.Equal(["initial"], model.Values);
         Assert.Equal("initial", model.Field);
@@ -114,7 +116,7 @@ public sealed class InteropTests
 
         var cat = (CatShape)Serializers.Deserialize<AnimalShape>(
             """{"$kind":"cat","Name":null,"Age":null,"Indoor":null}""",
-            options)!;
+            options);
 
         Assert.Equal("initial", cat.Name);
         Assert.Equal(41, cat.Age);
@@ -145,12 +147,12 @@ public sealed class InteropTests
         node.Next = node;
 
         string json = Serializers.Serialize(node, options);
-        GraphNode round = Serializers.Deserialize<GraphNode>(json, options)!;
+        GraphNode round = Serializers.Deserialize<GraphNode>(json, options);
 
         Assert.Equal("first", round.Name);
         Assert.Same(round, round.Next);
 
-        GraphNode skipped = Serializers.Deserialize<GraphNode>("""{"$id":"1","Name":null}""", options)!;
+        GraphNode skipped = Serializers.Deserialize<GraphNode>("""{"$id":"1","Name":null}""", options);
         Assert.Equal("initial", skipped.Name);
     }
 
@@ -160,10 +162,10 @@ public sealed class InteropTests
     {
         JsonSerializerOptions options = Serializers.Create(configuration);
 
-        PopulateModel populated = Serializers.Deserialize<PopulateModel>("""{"Values":["b"]}""", options)!;
+        PopulateModel populated = Serializers.Deserialize<PopulateModel>("""{"Values":["b"]}""", options);
         Assert.Equal(["a", "b"], populated.Values);
 
-        PopulateModel skipped = Serializers.Deserialize<PopulateModel>("""{"Values":null}""", options)!;
+        PopulateModel skipped = Serializers.Deserialize<PopulateModel>("""{"Values":null}""", options);
         Assert.Equal(["a"], skipped.Values);
     }
 
@@ -179,14 +181,14 @@ public sealed class InteropTests
 
         NumberHandlingModel fromStrings = Serializers.Deserialize<NumberHandlingModel>(
             """{"Count":"9","Ratio":"2.5"}""",
-            options)!;
+            options);
 
         Assert.Equal(9, fromStrings.Count);
         Assert.Equal(2.5, fromStrings.Ratio);
 
         NumberHandlingModel skipped = Serializers.Deserialize<NumberHandlingModel>(
             """{"Count":null,"Ratio":null}""",
-            options)!;
+            options);
 
         Assert.Equal(3, skipped.Count);
         Assert.Equal(1.5, skipped.Ratio);
@@ -205,7 +207,7 @@ public sealed class InteropTests
         Assert.Throws<JsonException>(() =>
             Serializers.Deserialize<ReferenceModel>("""{"Nope":1}""", options));
 
-        ReferenceModel model = Serializers.Deserialize<ReferenceModel>("""{"Name":null}""", options)!;
+        ReferenceModel model = Serializers.Deserialize<ReferenceModel>("""{"Name":null}""", options);
         Assert.Equal("initial", model.Name);
     }
 }

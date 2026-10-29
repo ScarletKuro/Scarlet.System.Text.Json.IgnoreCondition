@@ -15,7 +15,7 @@ public sealed class MixedConditionTests
         JsonSerializerOptions options = Serializers.Create(configuration,
             configureOptions: static o => o.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull);
         MixedConditionModel model = Serializers.Deserialize<MixedConditionModel>(
-            """{"Name":null,"Count":null,"ReadIgnored":"incoming"}""", options)!;
+            """{"Name":null,"Count":null,"ReadIgnored":"incoming"}""", options);
         Assert.Equal("initial", model.Name);
         Assert.Equal(7, model.Count);
         Assert.Equal("initial", model.ReadIgnored);
@@ -38,7 +38,7 @@ public sealed class MixedConditionTests
         JsonSerializerOptions options = Serializers.Create(configuration, static settings =>
             settings.DefaultReadCondition = JsonIgnoreConditionEx.WhenReadingNull);
         NativePrecedenceModel model = Serializers.Deserialize<NativePrecedenceModel>(
-            """{"NeverRead":"incoming"}""", options)!;
+            """{"NeverRead":"incoming"}""", options);
         Assert.Equal("initial", model.NeverRead);
         using JsonDocument json = JsonDocument.Parse(Serializers.Serialize(model, options));
         Assert.False(json.RootElement.TryGetProperty("NeverWritten", out _));
@@ -50,7 +50,7 @@ public sealed class MixedConditionTests
     public void Explicit_extended_rules_apply_even_with_native_Never(SerializerConfiguration configuration)
     {
         JsonSerializerOptions options = Serializers.Create(configuration);
-        MixedConditionModel model = Serializers.Deserialize<MixedConditionModel>("""{"AlwaysWritten":null}""", options)!;
+        MixedConditionModel model = Serializers.Deserialize<MixedConditionModel>("""{"AlwaysWritten":null}""", options);
         Assert.Equal(9, model.AlwaysWritten);
     }
 

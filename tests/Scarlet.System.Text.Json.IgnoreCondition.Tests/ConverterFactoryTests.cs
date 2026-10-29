@@ -19,8 +19,8 @@ public sealed class ConverterFactoryTests
     {
         JsonSerializerOptions options = Serializers.Create(configuration);
 
-        Assert.Equal(Season.Autumn, Serializers.Deserialize<ConverterFactoryModel>("""{"Season":null}""", options)!.Season);
-        Assert.Equal(Season.Spring, Serializers.Deserialize<ConverterFactoryModel>("""{"Season":"Spring"}""", options)!.Season);
+        Assert.Equal(Season.Autumn, Serializers.Deserialize<ConverterFactoryModel>("""{"Season":null}""", options).Season);
+        Assert.Equal(Season.Spring, Serializers.Deserialize<ConverterFactoryModel>("""{"Season":"Spring"}""", options).Season);
         Assert.Equal("""{"Season":"Autumn"}""", Serializers.Serialize(new ConverterFactoryModel(), options));
     }
 
@@ -31,8 +31,8 @@ public sealed class ConverterFactoryTests
     {
         JsonSerializerOptions options = Serializers.Create(configuration);
 
-        Assert.Equal(Season.Autumn, Serializers.Deserialize<ConverterFactoryRecord>("""{"Season":null}""", options)!.Season);
-        Assert.Equal(Season.Spring, Serializers.Deserialize<ConverterFactoryRecord>("""{"Season":"Spring"}""", options)!.Season);
+        Assert.Equal(Season.Autumn, Serializers.Deserialize<ConverterFactoryRecord>("""{"Season":null}""", options).Season);
+        Assert.Equal(Season.Spring, Serializers.Deserialize<ConverterFactoryRecord>("""{"Season":"Spring"}""", options).Season);
         Assert.Equal("""{"Season":"Autumn"}""", Serializers.Serialize(new ConverterFactoryRecord(), options));
     }
 }

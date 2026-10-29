@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Xunit;
@@ -56,6 +57,32 @@ public sealed class GuardRailTests
         [property: JsonIgnoreEx(JsonIgnoreConditionEx.WhenReadingNull)]
         [property: JsonConverter(typeof(NullConverterFactory))] int Count = 3);
 
+    /// <summary>
+    /// A converter for a base type that claims every type. The serializer accepts it on an int member and
+    /// adapts it internally; the library can only wrap a converter for the exact member type.
+    /// </summary>
+    public sealed class BaseTypeConverter : JsonConverter<object>
+    {
+        public override bool CanConvert(Type typeToConvert) => true;
+
+        public override object Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) =>
+            reader.TokenType == JsonTokenType.String ? int.Parse(reader.GetString()!, CultureInfo.InvariantCulture) : reader.GetInt32();
+
+        public override void Write(Utf8JsonWriter writer, object value, JsonSerializerOptions options) =>
+            writer.WriteNumberValue((int)value);
+    }
+
+    public sealed class BaseTypeConverterPropertyModel
+    {
+        [JsonIgnoreEx(JsonIgnoreConditionEx.WhenReadingNull)]
+        [JsonConverter(typeof(BaseTypeConverter))]
+        public int Count { get; set; } = 3;
+    }
+
+    public sealed record BaseTypeConverterParameterModel(
+        [property: JsonIgnoreEx(JsonIgnoreConditionEx.WhenReadingNull)]
+        [property: JsonConverter(typeof(BaseTypeConverter))] int Count = 3);
+
     /// <summary>A factory that claims the type but creates nothing.</summary>
     public sealed class NullConverterFactory : JsonConverterFactory
     {
@@ -77,6 +104,8 @@ public sealed class GuardRailTests
         typeof(ObjectParameterModel),
         typeof(NumberHandlingParameterModel),
         typeof(ClassNumberHandlingParameterModel),
+        typeof(BaseTypeConverterPropertyModel),
+        typeof(BaseTypeConverterParameterModel),
     ];
 
 
@@ -160,6 +189,35 @@ public sealed class GuardRailTests
         Assert.Contains("JsonNumberHandling", fromOptions.Message);
     }
 
+    /// <summary>
+    /// Settable value types are re-declared as T? around the member's converter, and constructor
+    /// parameters get a substituting converter around it; both need it to convert exactly T. Before this
+    /// was checked, the constructor path failed with an InvalidCastException.
+    /// </summary>
+    [Fact]
+    public void A_member_converter_for_a_base_type_is_refused_on_settable_members_and_parameters()
+    {
+        NotSupportedException property = Assert.Throws<NotSupportedException>(() =>
+            Deserialize<BaseTypeConverterPropertyModel>("""{"Count":"7"}"""));
+        Assert.Contains("only a converter for the member's own type can be wrapped", property.Message);
+        Assert.Contains(nameof(BaseTypeConverter), property.Message);
+
+        NotSupportedException parameter = Assert.Throws<NotSupportedException>(() =>
+            Deserialize<BaseTypeConverterParameterModel>("""{"Count":"7"}"""));
+        Assert.Contains("only a converter for the member's own type can be wrapped", parameter.Message);
+    }
+
+    [Fact]
+    public void Skip_leaves_a_base_type_member_converter_to_the_serializer()
+    {
+        JsonSerializerOptions options = Serializers.Create(
+            SerializerConfiguration.Reflection,
+            static settings => settings.UnsupportedMemberBehavior = UnsupportedMemberBehavior.Skip);
+
+        Assert.Equal(7, Serializers.Deserialize<BaseTypeConverterPropertyModel>("""{"Count":"7"}""", options).Count);
+        Assert.Equal(7, Serializers.Deserialize<BaseTypeConverterParameterModel>("""{"Count":"7"}""", options).Count);
+    }
+
     [Fact]
     public void A_converter_factory_that_creates_no_converter_is_refused()
     {
@@ -195,11 +253,11 @@ public sealed class GuardRailTests
 
         RequiredMemberModel model = Serializers.Deserialize<RequiredMemberModel>(
             """{"Value":null}""",
-            options)!;
+            options);
 
         Assert.Null(model.Value);
     }
 
     private static T Deserialize<T>(string json) =>
-        Serializers.Deserialize<T>(json, Serializers.Create(SerializerConfiguration.Reflection))!;
+        Serializers.Deserialize<T>(json, Serializers.Create(SerializerConfiguration.Reflection));
 }

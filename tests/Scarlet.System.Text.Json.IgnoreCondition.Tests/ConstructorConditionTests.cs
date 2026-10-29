@@ -34,7 +34,7 @@ public sealed class ConstructorConditionTests
         Assert.Equal(2, json.RootElement.GetProperty("Payload").GetInt32());
 
         ObjectPayloadModel model = Serializers.Deserialize<ObjectPayloadModel>(
-            """{"First":{"$id":"1","Value":2},"Payload":{"$ref":"1"}}""", options)!;
+            """{"First":{"$id":"1","Value":2},"Payload":{"$ref":"1"}}""", options);
         Assert.Same(model.First, model.Payload);
     }
 
@@ -149,5 +149,5 @@ public sealed class ConstructorConditionTests
     }
 
     private static T Deserialize<T>(string json, JsonSerializerOptions options) =>
-        Serializers.Deserialize<T>(json, options)!;
+        Serializers.Deserialize<T>(json, options);
 }

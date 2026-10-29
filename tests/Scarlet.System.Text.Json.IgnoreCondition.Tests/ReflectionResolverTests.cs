@@ -17,8 +17,9 @@ public sealed class ReflectionResolverTests
     {
         var options = new JsonSerializerOptions { TypeInfoResolver = new ExtendedIgnoreConditionResolver() };
 
-        ValueModel model = JsonSerializer.Deserialize<ValueModel>("""{"Age":null,"Season":null}""", options)!;
+        ValueModel? model = JsonSerializer.Deserialize<ValueModel>("""{"Age":null,"Season":null}""", options);
 
+        Assert.NotNull(model);
         Assert.Equal(41, model.Age);
         Assert.Equal(Season.Summer, model.Season);
     }
@@ -32,8 +33,9 @@ public sealed class ReflectionResolverTests
                 new ExtendedIgnoreConditionSettings { DefaultReadCondition = JsonIgnoreConditionEx.WhenReadingNull }),
         };
 
-        OptionsDefaultModel model = JsonSerializer.Deserialize<OptionsDefaultModel>("""{"Name":null}""", options)!;
+        OptionsDefaultModel? model = JsonSerializer.Deserialize<OptionsDefaultModel>("""{"Name":null}""", options);
 
+        Assert.NotNull(model);
         Assert.Equal("initial", model.Name);
     }
 

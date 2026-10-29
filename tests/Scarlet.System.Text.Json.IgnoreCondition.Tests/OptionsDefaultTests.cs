@@ -23,7 +23,7 @@ public sealed class OptionsDefaultTests
 
         OptionsDefaultModel model = Serializers.Deserialize<OptionsDefaultModel>(
             """{"Name":null,"Values":null,"Optional":null}""",
-            options)!;
+            options);
 
         Assert.Equal("initial", model.Name);
         Assert.Equal(["a"], model.Values);
@@ -40,7 +40,7 @@ public sealed class OptionsDefaultTests
 
         OptionsDefaultModel model = Serializers.Deserialize<OptionsDefaultModel>(
             """{"Name":null,"OptedOut":null}""",
-            options)!;
+            options);
 
         Assert.Equal("initial", model.Name);
         Assert.Null(model.OptedOut);
@@ -73,7 +73,7 @@ public sealed class OptionsDefaultTests
             configuration,
             static settings => settings.DefaultReadCondition = JsonIgnoreConditionEx.WhenReadingNull);
 
-        WriteModel model = Serializers.Deserialize<WriteModel>("""{"Kept":null}""", options)!;
+        WriteModel model = Serializers.Deserialize<WriteModel>("""{"Kept":null}""", options);
 
         Assert.Equal("kept", model.Kept);
     }
@@ -86,7 +86,7 @@ public sealed class OptionsDefaultTests
             configuration,
             static settings => settings.DefaultReadCondition = JsonIgnoreConditionEx.WhenReadingNull);
 
-        RecordModel model = Serializers.Deserialize<RecordModel>("""{"Name":null,"Age":null}""", options)!;
+        RecordModel model = Serializers.Deserialize<RecordModel>("""{"Name":null,"Age":null}""", options);
 
         Assert.Equal("unknown", model.Name);
         Assert.Equal(41, model.Age);
@@ -109,7 +109,7 @@ public sealed class OptionsDefaultTests
         {
             UnregisteredValueTypeModel model = Serializers.Deserialize<UnregisteredValueTypeModel>(
                 """{"Shade":null}""",
-                options)!;
+                options);
 
             Assert.Equal(Shade.Dark, model.Shade);
         }
@@ -138,7 +138,7 @@ public sealed class OptionsDefaultTests
         {
             Assert.Equal(
                 Shade.Dark,
-                Serializers.Deserialize<UnregisteredValueTypeModel>("""{"Shade":null}""", options)!.Shade);
+                Serializers.Deserialize<UnregisteredValueTypeModel>("""{"Shade":null}""", options).Shade);
         }
         else
         {
@@ -199,7 +199,7 @@ public sealed class OptionsDefaultTests
 
         CustomValueTypeModel model = Serializers.Deserialize<CustomValueTypeModel>(
             """{"Location":null,"Priority":null}""",
-            options)!;
+            options);
 
         Assert.Equal(new Point(3, 4), model.Location);
         Assert.Equal(Priority.High, model.Priority);
@@ -237,7 +237,7 @@ public sealed class OptionsDefaultTests
                 settings.UnsupportedMemberBehavior = UnsupportedMemberBehavior.Skip;
             });
 
-        Assert.Equal(Shade.Dark, Serializers.Deserialize<UnregisteredValueTypeModel>("{}", options)!.Shade);
+        Assert.Equal(Shade.Dark, Serializers.Deserialize<UnregisteredValueTypeModel>("{}", options).Shade);
         Assert.Throws<JsonException>(() =>
             Serializers.Deserialize<UnregisteredValueTypeModel>("""{"Shade":null}""", options));
     }

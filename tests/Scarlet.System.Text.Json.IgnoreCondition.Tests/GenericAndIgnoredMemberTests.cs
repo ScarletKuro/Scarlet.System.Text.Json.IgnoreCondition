@@ -15,14 +15,14 @@ public sealed class GenericAndIgnoredMemberTests
 
         GenericModel<string> model = Serializers.Deserialize<GenericModel<string>>(
             """{"Value":null,"Count":null}""",
-            options)!;
+            options);
 
         Assert.Null(model.Value);
         Assert.Equal(5, model.Count);
 
         GenericModel<string> assigned = Serializers.Deserialize<GenericModel<string>>(
             """{"Value":"x","Count":9}""",
-            options)!;
+            options);
 
         Assert.Equal("x", assigned.Value);
         Assert.Equal(9, assigned.Count);
@@ -40,7 +40,7 @@ public sealed class GenericAndIgnoredMemberTests
 
         IgnoredMemberModel model = Serializers.Deserialize<IgnoredMemberModel>(
             """{"Hidden":"from json","Visible":null}""",
-            options)!;
+            options);
 
         Assert.Equal("initial", model.Hidden);
         Assert.Equal("initial", model.Visible);

@@ -185,6 +185,23 @@ internal sealed class ExtendedIgnoreConditionModifier
 
                 property.CustomConverter = created;
             }
+
+            // The serializer also accepts a member converter for a base type, such as a
+            // JsonConverter<object> on an int, and adapts it with an internal casting converter after
+            // modifiers have run. Both wrapping mechanisms need a converter for the exact member type,
+            // so refuse any other rather than fail later with an InvalidCastException.
+            if ((isConstructorBound || ops.SupportsNullableProjection) &&
+                property.CustomConverter is { } memberConverter &&
+                memberConverter.Type != memberType)
+            {
+                Refuse(
+                    isExplicit,
+                    typeInfo,
+                    property,
+                    $"its converter '{memberConverter.GetType()}' converts '{memberConverter.Type}', not " +
+                    $"'{memberType}', and only a converter for the member's own type can be wrapped.");
+                return;
+            }
         }
 
         if (isConstructorBound)
@@ -228,17 +245,7 @@ internal sealed class ExtendedIgnoreConditionModifier
 
         if (ops?.SupportsNullableProjection == true)
         {
-            if (ops.CreateNullableProjection(typeInfo, property) is not { } projection)
-            {
-                Refuse(
-                    isExplicit,
-                    typeInfo,
-                    property,
-                    $"the converter declared on it cannot be lifted over 'System.Nullable<{memberType}>'.");
-                return;
-            }
-
-            CompleteNullableProjection(typeInfo, index, property, projection, ops, condition);
+            CompleteNullableProjection(typeInfo, index, property, ops.CreateNullableProjection(typeInfo, property), ops, condition);
         }
         else
         {
