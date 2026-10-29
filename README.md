@@ -4,8 +4,9 @@
 [![GitHub](https://img.shields.io/github/license/ScarletKuro/Scarlet.System.Text.Json.IgnoreCondition?color=594ae2&logo=github)](https://github.com/ScarletKuro/Scarlet.System.Text.Json.IgnoreCondition/blob/master/LICENSE)
 [![codecov](https://codecov.io/github/ScarletKuro/Scarlet.System.Text.Json.IgnoreCondition/graph/badge.svg?token=UF5Q4EFWDG)](https://codecov.io/github/ScarletKuro/Scarlet.System.Text.Json.IgnoreCondition)
 
-`WhenReadingNull` and `WhenReadingDefault` for `System.Text.Json`, for both the reflection-based and
-source-generated serializers, NativeAOT included. Standard ignore conditions use native `[JsonIgnore]`.
+Skip `null` (or default) values when deserializing with `System.Text.Json`, so your properties keep their
+initial values. Adds the missing `WhenReadingNull` and `WhenReadingDefault` ignore conditions, and works with
+reflection, source generation and NativeAOT.
 
 ```csharp
 public sealed class Settings
@@ -17,91 +18,81 @@ public sealed class Settings
     public int RetryCount { get; set; } = 3;
 }
 
-var options = new JsonSerializerOptions
-{
-    TypeInfoResolver = new ExtendedIgnoreConditionResolver(),
-};
+var options = new JsonSerializerOptions { TypeInfoResolver = new ExtendedIgnoreConditionResolver() };
 
 var settings = JsonSerializer.Deserialize<Settings>("""{"Endpoint":null,"RetryCount":null}""", options);
-// settings.Endpoint == "https://localhost"
-// settings.RetryCount == 3          (without the library this line throws)
+// settings.Endpoint   == "https://localhost"
+// settings.RetryCount == 3    (plain System.Text.Json throws here)
 ```
 
 ## Why
 
-`System.Text.Json` supports ignoring an entire member when reading, but cannot conditionally skip an
-incoming null or default value while preserving an initializer.
+Out of the box, `System.Text.Json` can ignore a member entirely, but it cannot skip just an incoming `null`.
+That causes a few well-known problems:
 
-| Condition | net8 / net9 | net10 | configuration |
-| --- | --- | --- | --- |
-| `Never`, `Always`, `WhenWritingDefault`, `WhenWritingNull` | yes | yes | native `[JsonIgnore]` |
-| `WhenWriting`, `WhenReading` | no | yes | native `[JsonIgnore]` |
-| **`WhenReadingNull`** | **no** | **no** | `[JsonIgnoreEx(WhenReadingNull)]` |
-| **`WhenReadingDefault`** | **no** | **no** | `[JsonIgnoreEx(WhenReadingDefault)]` |
+- **A `null` wipes your initializer.** `{"Values": null}` replaces `List<string> Values { get; set; } = [];`
+  with `null` ([dotnet/runtime#62086]).
+- **A `null` for a non-nullable value type throws.** `{"Age": null}` against `int Age` is a `JsonException`
+  ([dotnet/runtime#74008], [#83706][dotnet/runtime#83706], [#30795][dotnet/runtime#30795]).
+- **Migrating from Newtonsoft.Json regresses.** `NullValueHandling.Ignore` skipped those nulls; there is no
+  built-in equivalent ([dotnet/runtime#90011]).
 
-That gap shows up as three long-standing issues:
-
-- **[dotnet/runtime#90011]** — the `WhenReadingNull` proposal itself, still marked not ready for
-  implementation.
-- **[dotnet/runtime#62086]** — `JsonSerializerOptions.IgnoreNullValues` used to ignore nulls on read as
-  well as write. Its replacement, `DefaultIgnoreCondition = WhenWritingNull`, deliberately does not, so
-  `{"Values": null}` wipes a `List<string> Values { get; set; } = new()` initializer with no supported
-  way to opt out.
-- **[dotnet/runtime#74008]**, **[dotnet/runtime#83706]**, **[dotnet/runtime#30795]** — `{"Age": null}`
-  against a non-nullable `int Age` throws instead of being ignored. Json.NET's
-  `NullValueHandling.Ignore` ignores it, so migrations regress.
-
-`JsonPropertyInfo.ShouldSerialize` has existed since .NET 7 for the write side; no `ShouldDeserialize`
-counterpart was ever added. This library supplies the missing half through supported contract
-customization.
-
-## Install
+## Getting started
 
 ```
 dotnet add package Scarlet.System.Text.Json.IgnoreCondition
 ```
 
-Targets **net10.0**. One runtime assembly, plus bundled analyzer and code-fix assemblies; the analyzer
-assembly also carries a small source generator that registers custom value types for NativeAOT. Nothing
-to configure and no MSBuild integration.
-
-## Use
-
-Annotate members, then set `ExtendedIgnoreConditionResolver` as the resolver.
+Requires **.NET 10**. Annotate your members, then use `ExtendedIgnoreConditionResolver` as the
+`TypeInfoResolver`:
 
 ```csharp
 using Scarlet.System.Text.Json.IgnoreCondition;
 
-// Source-generated, including NativeAOT — no reflection over your model
-options.TypeInfoResolver = new ExtendedIgnoreConditionResolver(MyJsonContext.Default);
+var options = new JsonSerializerOptions
+{
+    // Source generation (recommended, NativeAOT-compatible)
+    TypeInfoResolver = new ExtendedIgnoreConditionResolver(MyJsonContext.Default),
 
-// Reflection-based
-options.TypeInfoResolver = new ExtendedIgnoreConditionResolver();
-
-// Composing with your own contract customizations: wrap whatever produced the metadata
-var mine = new DefaultJsonTypeInfoResolver();
-mine.Modifiers.Add(MyModifier);
-options.TypeInfoResolver = new ExtendedIgnoreConditionResolver(mine);
+    // or reflection:
+    // TypeInfoResolver = new ExtendedIgnoreConditionResolver(),
+};
 ```
 
-Use `JsonIgnoreEx` for the extended read condition and native `JsonIgnore` for the write condition:
+Already customizing contracts? Wrap whatever produces your metadata, and your modifiers keep working:
 
 ```csharp
-[JsonIgnoreEx(JsonIgnoreConditionEx.WhenReadingNull)]
-[JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-public string? Name { get; set; } = "initial";
+var resolver = new DefaultJsonTypeInfoResolver();
+resolver.Modifiers.Add(MyModifier);
+options.TypeInfoResolver = new ExtendedIgnoreConditionResolver(resolver);
 ```
 
-The condition is required: a bare `[JsonIgnoreEx]` would read like native `[JsonIgnore]`, which excludes
-the member entirely, so it does not compile. Only one `JsonIgnoreEx` is allowed per member.
-The bundled analyzer warns when native `WhenReading` conflicts with it (`SJI0001`), or native `Always`
-makes it ineffective (`SJI0002`). The fixes let you choose which conflicting rule to keep, or remove
-the ineffective extended attribute. See [docs/analyzers.md](https://github.com/ScarletKuro/Scarlet.System.Text.Json.IgnoreCondition/blob/master/docs/analyzers.md).
+## The conditions
+
+| Condition | Skips an incoming… | Example: `int Count = 3` receives |
+| --- | --- | --- |
+| `WhenReadingNull` | `null` | `null` → stays `3`; `0` → becomes `0` |
+| `WhenReadingDefault` | `null` or the type's default value | `null` → stays `3`; `0` → stays `3` |
+
+The default is that of the declared type: for `int?` it is `null`, so `WhenReadingDefault` on an `int?`
+skips `null` but assigns `0`.
+
+These conditions only affect reading. For writing, keep using the native `[JsonIgnore]`, and combine the
+two freely:
+
+```csharp
+[JsonIgnoreEx(JsonIgnoreConditionEx.WhenReadingNull)]                 // reading: skip null
+[JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]         // writing: omit null
+public string? Currency { get; set; } = "EUR";
+```
+
+The condition is always spelled out: a bare `[JsonIgnoreEx]` would look like `[JsonIgnore]`, which does
+something very different, so it does not compile.
 
 ### Records and constructor parameters
 
-A member bound to a deserialization constructor parameter has no setter to intercept, so an incoming
-null falls back to the parameter's own default value. Target the generated property explicitly:
+For a positional record, put the attribute on the generated property with `property:`. An incoming `null`
+then falls back to the parameter's default value:
 
 ```csharp
 public sealed record Credentials(
@@ -110,159 +101,105 @@ public sealed record Credentials(
 // {"User":null} -> User == "anonymous"
 ```
 
-This applies to types the serializer constructs through that constructor. A positional `record struct`
-is deserialized through its parameterless constructor and settable properties, so a skipped null leaves
-the member at `default`, not at the parameter's default value.
+A positional `record struct` is deserialized through its parameterless constructor, so there a skipped
+`null` leaves the member at `default`.
 
-### Replacing `IgnoreNullValues` wholesale
+### Applying a condition to every member
 
-The obsolete `IgnoreNullValues = true` skips nulls in both directions. Its replacement splits the two
-halves: `DefaultIgnoreCondition` for writing, and this library's options-level default for reading.
-Individual members opt out with native `[JsonIgnore(Condition = JsonIgnoreCondition.Never)]`. An explicit
-`JsonIgnoreEx` still takes precedence over that opt-out.
+Instead of annotating each member, set a default for all of them:
 
 ```csharp
 var options = new JsonSerializerOptions
 {
-    DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+    DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,   // writing: omit nulls
     TypeInfoResolver = new ExtendedIgnoreConditionResolver(
         MyJsonContext.Default,
         new ExtendedIgnoreConditionSettings
         {
-            DefaultReadCondition = JsonIgnoreConditionEx.WhenReadingNull,
+            DefaultReadCondition = JsonIgnoreConditionEx.WhenReadingNull,   // reading: skip nulls
         }),
 };
 ```
 
-Writing is identical to `IgnoreNullValues`. Reading skips every null `IgnoreNullValues` skipped, and three
-more:
+A single member opts out with `[JsonIgnore(Condition = JsonIgnoreCondition.Never)]`, and an explicit
+`[JsonIgnoreEx]` always wins over the default. Members the default cannot apply to, such as `required` or
+read-only ones, are left alone.
 
-| Incoming `null` for | `IgnoreNullValues = true` | Replacement above |
+## Migrating from Newtonsoft.Json or `IgnoreNullValues`
+
+| You have | Use |
+| --- | --- |
+| `[JsonProperty(NullValueHandling = NullValueHandling.Ignore)]` | `[JsonIgnoreEx(JsonIgnoreConditionEx.WhenReadingNull)]` plus `[JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]` |
+| `JsonSerializerSettings.NullValueHandling = NullValueHandling.Ignore` | [A default for every member](#applying-a-condition-to-every-member) |
+| `JsonSerializerOptions.IgnoreNullValues = true` (obsolete) | [A default for every member](#applying-a-condition-to-every-member) |
+
+The options-level replacement writes exactly what `IgnoreNullValues` wrote, and skips every `null` it
+skipped when reading, plus a few it never could:
+
+| Incoming `null` for | `IgnoreNullValues = true` | This library |
 | --- | --- | --- |
 | reference type, collection, `Nullable<T>` | skipped | skipped |
 | non-nullable value type, e.g. `int` | throws `JsonException` | skipped |
 | constructor parameter of a non-nullable value type | throws `JsonException` | parameter default |
-| member with a native write condition (`WhenWritingNull`, `WhenWritingDefault`, `WhenWriting`) | null assigned | skipped |
-| member with native `Never` | null assigned | null assigned |
+| member with a native write condition, e.g. `[JsonIgnore(Condition = WhenWritingNull)]` | `null` assigned | skipped |
+| member with `[JsonIgnore(Condition = Never)]` | `null` assigned | `null` assigned |
 
-The fourth row is easy to miss: any native `[JsonIgnore(Condition = …)]`, even a write-only one, turns
-`IgnoreNullValues` off for that member on the read side too. The library treats write conditions as
-compatible with the read default; only `Never` opts out.
+You can also migrate gradually: the resolver works alongside `IgnoreNullValues`, so members can be
+annotated one at a time before switching the options over.
 
-`IgnoreNullValues` and `DefaultIgnoreCondition` cannot both be set; System.Text.Json throws. The library
-itself works alongside `IgnoreNullValues`, so a migration can keep it while members are annotated one at a
-time. `[JsonIgnoreEx]` members then behave as documented, and the rest keep the old behaviour.
+## NativeAOT
 
-Under NativeAOT, custom enums and structs reached only by this default are not registered by the
-generator. Set `RequireValueTypeRegistration = true` so JIT runs list them; see [NativeAOT](#nativeaot).
+It works out of the box. Custom enums and structs need a small piece of registration under NativeAOT, and
+for members marked `[JsonIgnoreEx]` the package's source generator does it for you.
 
-## How it works
+Register a type yourself, once at startup, only when the generator cannot see it:
 
-The resolver walks `JsonTypeInfo.Properties` and reads each member's attributes from
-`JsonPropertyInfo.AttributeProvider` — which the reflection-based resolver and the `System.Text.Json`
-source generator both populate, so one implementation serves both. Then, per member, one of three
-mechanisms, because the serializer reaches the three shapes of member differently:
-
-| Member | Mechanism |
-| --- | --- |
-| Settable, type already accepts null (reference type or `Nullable<T>`) | `JsonPropertyInfo.Set` is wrapped, so the serializer's own null handling runs untouched and only the assignment is skipped. |
-| Settable, non-nullable value type | The contract re-declares the member as `T?` with the same accessors and the serializer's own `Nullable<T>` converter. The null is then read rather than rejected, and the wrapped setter drops it. |
-| Bound to a constructor parameter | The property's converter is intercepted and substitutes the parameter's default value for a null. |
-
-Mistakes surface as a `NotSupportedException` naming the member and the reason, the first time the
-contract is resolved — a read-side condition on a `required` member, on the extension data member, on a
-member with no setter, two conditions on the same side, and so on. See
-[docs/limitations.md](https://github.com/ScarletKuro/Scarlet.System.Text.Json.IgnoreCondition/blob/master/docs/limitations.md).
-
-### NativeAOT
-
-The value-type mechanisms need metadata for `Nullable<T>`, which is a generic instantiation over the
-member type. The library roots that for every built-in value type, so nothing is created at run time for
-the common cases. A **custom enum or struct** needs registering, and for members that carry
-`[JsonIgnoreEx]` the bundled source generator does it for you: it emits a module initializer that calls
-`ExtendedIgnoreConditionResolver.RegisterValueType<T>()` for each such type. There is nothing to configure.
-
-The generator cannot see two cases, which you register yourself once at startup:
-
-- a member reached only by `DefaultReadCondition`, with no `[JsonIgnoreEx]` of its own;
-- a member whose type is a generic type parameter, closed over your struct elsewhere.
+- it is used only through `DefaultReadCondition`, by a member without `[JsonIgnoreEx]`;
+- it reaches a generic model through a type parameter, e.g. `MyModel<LogLevel>`.
 
 ```csharp
 ExtendedIgnoreConditionResolver.RegisterValueType<LogLevel>();
 ```
 
-Miss one and the condition is refused when the contract is resolved, with a message naming exactly that
-line, rather than surfacing later as a `JsonException` on a null payload. Under JIT the runtime fills the
-gap silently, so an application heading for NativeAOT should turn on the strict check now and let its
-ordinary tests find anything missing:
+Under JIT a missing registration goes unnoticed, so if you plan to publish with NativeAOT, turn on the
+strict check now. Your ordinary tests then report anything missing, with the exact line to add:
 
 ```csharp
 new ExtendedIgnoreConditionSettings { RequireValueTypeRegistration = true }
 ```
 
-Reference types, built-in value types and settable `Nullable<T>` members under `WhenReadingNull` never
-need registering.
+Built-in types (`int`, `Guid`, `DateTime`, `string` and so on) never need registering.
 
-## Performance
+## Analyzer
 
-Three findings, each of which reproduced across every run of
-`benchmarks/Scarlet.System.Text.Json.IgnoreCondition.Benchmarks` (net10.0, in-process BenchmarkDotNet, a
-four-member model through a source-generated context):
+The package includes an analyzer with code fixes for attribute combinations that cannot work:
 
-- **Unannotated types cost nothing.** Serializing a type with no conditions measures the same with the
-  library installed as without it, because the resolver leaves contracts it has nothing to say about
-  completely untouched — so they keep the source-generated serialization fast path.
-- **Annotated types lose that fast path**, costing roughly 1.3–1.4× on serialization. Customizing a
-  `JsonTypeInfo` sets the serializer's internal `IsCustomized` flag, which disables the generated fast
-  path for that type. Every possible implementation of this feature pays that cost; the library confines
-  it to the types that actually carry a condition.
-- **Reading is not measurably slower.** Deserializing an annotated type measures the same as an
-  unannotated one, and skipping a null is cheaper than assigning one (roughly 0.6× of a full read).
+| Rule | Reported when |
+| --- | --- |
+| `SJI0001` | `[JsonIgnore(Condition = WhenReading)]` conflicts with `[JsonIgnoreEx]` on the same member |
+| `SJI0002` | `[JsonIgnore]` already ignores the member, so `[JsonIgnoreEx]` has no effect |
 
-Absolute numbers are deliberately not quoted: the runs available were on a busy developer machine, with
-standard deviations of 10–30%, which is enough to compare the pairs above but not to publish figures.
-Measure on your own hardware with:
+See [the analyzer documentation][analyzers] for details.
 
-```
-dotnet run --project benchmarks/Scarlet.System.Text.Json.IgnoreCondition.Benchmarks -c Release -- --filter '*'
-```
+## Good to know
 
-## Build and validate
+- **Mistakes fail fast.** A condition that cannot be applied, for example on a `required` member or one
+  with no setter, throws a `NotSupportedException` naming the member and the reason when the type is first
+  used, instead of being silently ignored. The full list is in [Limitations][limitations].
+- **Performance.** Types without conditions are untouched and cost nothing. Annotated types lose the
+  source generator's serialization fast path, which costs roughly 1.3–1.4× when *writing* them; that is
+  inherent to customizing a contract. Reading is not measurably slower.
+- **How it works.** The resolver uses `System.Text.Json`'s supported contract customization API to skip
+  the assignment of an incoming `null` or default value. No private reflection is involved.
 
-Requires the .NET 10 SDK. Tests use `xunit.v3.aot` and Microsoft.Testing.Platform, selected in
-`global.json` for the .NET 10 test runner.
+## License
 
-```sh
-dotnet test --project tests/Scarlet.System.Text.Json.IgnoreCondition.Tests -c Release
-dotnet test --project tests/Scarlet.System.Text.Json.IgnoreCondition.Analyzers.Tests -c Release
-dotnet pack src/Scarlet.System.Text.Json.IgnoreCondition -c Release -o artifacts/packages
-dotnet publish tests/Scarlet.System.Text.Json.IgnoreCondition.Tests -c Release -r win-x64 -p:NativeAotTests=true -o artifacts/aot
-```
-
-Run `artifacts/aot/Scarlet.System.Text.Json.IgnoreCondition.Tests.exe` after publishing. On Linux,
-use `linux-x64` and run the executable without the `.exe` suffix. NativeAOT publishing requires the
-platform's native compiler toolchain.
-
-The managed run covers reflection and both source-generated resolver modes. `NativeAotTests=true`
-compiles the same behavioral tests for both source-generated modes, excludes reflection-only tests,
-and disables serializer reflection. The published native binary also asserts that dynamic code is
-unavailable. Referencing the AOT test package alone does not replace publishing and running it.
-
-CI runs on every branch push (`continuous.yml`): the managed tests with coverage, then the NativeAOT
-tests published and executed on Linux (`test.yml`), and a pack uploaded as a build artifact.
-Package metadata, including the repository URL, is declared in `Directory.Build.props`, so a local pack
-produces the same package as CI.
-
-Releases are cut by pushing a SemVer tag, such as `1.0.0` or `1.1.0-preview.1`. `release.yml` takes the
-package version from the tag, runs the full test matrix on the tagged commit, and publishes to NuGet.org
-only if it passes, using trusted publishing rather than a stored API key.
-
-## Licence
-
-MIT.
+This project is licensed under the MIT License - see the [LICENSE](https://github.com/ScarletKuro/Scarlet.System.Text.Json.IgnoreCondition/blob/master/LICENSE) file for details.
 
 [dotnet/runtime#90011]: https://github.com/dotnet/runtime/issues/90011
 [dotnet/runtime#62086]: https://github.com/dotnet/runtime/issues/62086
 [dotnet/runtime#74008]: https://github.com/dotnet/runtime/issues/74008
 [dotnet/runtime#83706]: https://github.com/dotnet/runtime/issues/83706
 [dotnet/runtime#30795]: https://github.com/dotnet/runtime/issues/30795
+[analyzers]: https://github.com/ScarletKuro/Scarlet.System.Text.Json.IgnoreCondition/blob/master/docs/analyzers.md
+[limitations]: https://github.com/ScarletKuro/Scarlet.System.Text.Json.IgnoreCondition/blob/master/docs/limitations.md
