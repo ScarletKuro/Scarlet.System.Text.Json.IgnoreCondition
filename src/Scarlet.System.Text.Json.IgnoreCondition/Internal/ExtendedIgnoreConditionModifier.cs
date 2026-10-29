@@ -143,10 +143,12 @@ internal sealed class ExtendedIgnoreConditionModifier
             out ParameterInfo? parameter);
 
         // WhenReadingDefault always needs the typed default comparison; WhenReadingNull only needs
-        // typed metadata to reach a constructor parameter or to project a value type as T?.
+        // typed metadata to reach a constructor parameter, to project a value type as T?, or to route
+        // a null past a member converter (see the setter path below).
         bool needsTypedOps = condition == JsonIgnoreConditionEx.WhenReadingDefault ||
                              isConstructorBound ||
-                             IsNonNullableValueType(memberType);
+                             IsNonNullableValueType(memberType) ||
+                             property.CustomConverter is not null;
 
         MemberOps? ops = null;
         if (needsTypedOps)
@@ -188,9 +190,12 @@ internal sealed class ExtendedIgnoreConditionModifier
 
             // The serializer also accepts a member converter for a base type, such as a
             // JsonConverter<object> on an int, and adapts it with an internal casting converter after
-            // modifiers have run. Both wrapping mechanisms need a converter for the exact member type,
-            // so refuse any other rather than fail later with an InvalidCastException.
-            if ((isConstructorBound || ops.SupportsNullableProjection) &&
+            // modifiers have run. Wrapping needs a converter for the exact member type, so refuse any
+            // other rather than fail later with an InvalidCastException.
+            bool wrapsConverter = isConstructorBound ||
+                                  ops.SupportsNullableProjection ||
+                                  ops.HandlesNull(property.CustomConverter);
+            if (wrapsConverter &&
                 property.CustomConverter is { } memberConverter &&
                 memberConverter.Type != memberType)
             {
@@ -237,6 +242,19 @@ internal sealed class ExtendedIgnoreConditionModifier
             return;
         }
 
+        if (IsAssignedThroughObjectInitializer(typeInfo, property))
+        {
+            Refuse(
+                isExplicit,
+                typeInfo,
+                property,
+                "it is init-only, and the System.Text.Json source generator assigns init-only members " +
+                "through an object initializer: the setter the condition relies on is never called, and " +
+                "a member absent from the JSON loses its initializer too. Use a set accessor, a " +
+                "constructor parameter, or the reflection-based resolver.");
+            return;
+        }
+
         if (property.Set is null)
         {
             Refuse(isExplicit, typeInfo, property, "it has no setter, so there is no assignment to skip.");
@@ -249,6 +267,17 @@ internal sealed class ExtendedIgnoreConditionModifier
         }
         else
         {
+            // Every other path skips a JSON null before any converter sees it. A member converter that
+            // handles null itself would turn it into a value first, which the skipping setter would
+            // then assign, so route the null past it. It still reads every other token and writes.
+            if (ops?.HandlesNull(property.CustomConverter) == true)
+            {
+                property.CustomConverter = ops!.CreateDefaultOnNullConverter(
+                    property.CustomConverter,
+                    nullReplacement: null,
+                    replaceTypeDefaults: false);
+            }
+
             property.Set = CreateSkippingSetter(property.Set!, ops, condition);
 
             // The wrapper discards null before it reaches the model. Let it receive that null even
@@ -332,6 +361,16 @@ internal sealed class ExtendedIgnoreConditionModifier
             ? $"{type.Name[..type.Name.IndexOf('`', StringComparison.Ordinal)]}<" +
               $"{string.Join(", ", type.GetGenericArguments().Select(CSharpName))}>"
             : type.Name;
+
+    /// <summary>
+    /// Whether the serializer assigns the member through an object initializer instead of its setter. The
+    /// System.Text.Json source generator does that for init-only members, passing each one like a
+    /// constructor argument; the reflection-based resolver calls the init accessor like any setter.
+    /// </summary>
+    private static bool IsAssignedThroughObjectInitializer(JsonTypeInfo typeInfo, JsonPropertyInfo property) =>
+        typeInfo.OriginatingResolver is JsonSerializerContext &&
+        property.AttributeProvider is PropertyInfo { SetMethod: { } setter } &&
+        setter.ReturnParameter.GetRequiredCustomModifiers().Contains(typeof(IsExternalInit));
 
     private static bool IsNonNullableValueType(Type type) =>
         type.IsValueType && Nullable.GetUnderlyingType(type) is null;

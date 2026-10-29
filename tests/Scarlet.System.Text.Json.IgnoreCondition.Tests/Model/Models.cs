@@ -1,3 +1,4 @@
+using System.Text.Json;
 using System.Text.Json.Serialization;
 
 namespace Scarlet.System.Text.Json.IgnoreCondition.Tests;
@@ -408,6 +409,65 @@ public sealed class ArrayArgumentModel
     [JsonIgnoreEx(JsonIgnoreConditionEx.WhenReadingNull)]
     public ArrayBox<int[]> Box { get; set; } = new([1, 2]);
 }
+
+/// <summary>
+/// Init-only members. The reflection resolver assigns them through the init accessor; the source generator
+/// assigns them through an object initializer, which bypasses any setter.
+/// </summary>
+public sealed class InitOnlyModel
+{
+    [JsonIgnoreEx(JsonIgnoreConditionEx.WhenReadingNull)]
+    public string? Name { get; init; } = "initial";
+
+    [JsonIgnoreEx(JsonIgnoreConditionEx.WhenReadingNull)]
+    public int Count { get; init; } = 3;
+}
+
+/// <summary>Init-only, without an attribute: reached only by an options-level default.</summary>
+public sealed class UnannotatedInitOnlyModel
+{
+    public string? Name { get; init; } = "initial";
+}
+
+/// <summary>A converter that reads and writes JSON null itself (HandleNull), as a sentinel.</summary>
+public sealed class NullAsTextConverter : JsonConverter<string?>
+{
+    public override bool HandleNull => true;
+
+    public override string? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) =>
+        reader.TokenType == JsonTokenType.Null ? "from-null" : reader.GetString();
+
+    public override void Write(Utf8JsonWriter writer, string? value, JsonSerializerOptions options) =>
+        writer.WriteStringValue(value ?? "none");
+}
+
+/// <summary>The same for <see cref="Nullable{T}"/>: reads null as -1, writes null as -1.</summary>
+public sealed class NullAsMinusOneConverter : JsonConverter<int?>
+{
+    public override bool HandleNull => true;
+
+    public override int? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) =>
+        reader.TokenType == JsonTokenType.Null ? -1 : reader.GetInt32();
+
+    public override void Write(Utf8JsonWriter writer, int? value, JsonSerializerOptions options) =>
+        writer.WriteNumberValue(value ?? -1);
+}
+
+public sealed class NullHandlingConverterModel
+{
+    [JsonIgnoreEx(JsonIgnoreConditionEx.WhenReadingNull)]
+    [JsonConverter(typeof(NullAsTextConverter))]
+    public string? Name { get; set; } = "initial";
+
+    [JsonIgnoreEx(JsonIgnoreConditionEx.WhenReadingNull)]
+    [JsonConverter(typeof(NullAsMinusOneConverter))]
+    public int? Count { get; set; } = 3;
+}
+
+public sealed record NullHandlingConverterRecord(
+    [property: JsonIgnoreEx(JsonIgnoreConditionEx.WhenReadingNull)]
+    [property: JsonConverter(typeof(NullAsTextConverter))]
+    string? Name = "initial");
 
 /// <summary>A user enum that is deliberately never registered, not even for the NativeAOT run.</summary>
 public enum Shade

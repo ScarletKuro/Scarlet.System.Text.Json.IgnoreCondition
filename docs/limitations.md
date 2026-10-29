@@ -22,6 +22,7 @@ applicable options-level default is not touched at all, so it keeps its fast pat
 | `required` | The serializer must observe a value for it, so there is nothing to skip. |
 | No setter and not constructor-bound | There is no assignment to skip. |
 | `[JsonExtensionData]` | Extension data is not a normal member. |
+| `init`-only, with source generation | The `System.Text.Json` source generator assigns init-only members through an object initializer, so the setter the condition relies on is never called. A member absent from the JSON loses its initializer too, with or without this library. Use `set`, a constructor parameter, or the reflection-based resolver, which calls the init accessor like any setter. |
 | Also carries `[JsonIgnore]` | `[JsonIgnore]` wins. The serializer keeps the contract entry but strips both accessors, so the extended condition has nothing to act on and is skipped rather than reported. |
 
 Native `[JsonIgnore(Condition = JsonIgnoreCondition.WhenReading)]` conflicts with an explicit

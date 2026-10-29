@@ -78,6 +78,9 @@ internal abstract class MemberOps
     /// <summary>Whether a boxed value equals the default value of the member type.</summary>
     public abstract bool IsDefaultValue(object? boxedValue);
 
+    /// <summary>Whether a member converter for the member type reads JSON null itself.</summary>
+    public abstract bool HandlesNull(JsonConverter? converter);
+
     public abstract JsonConverter CreateDefaultOnNullConverter(
         JsonConverter? inner,
         object? nullReplacement,
@@ -164,6 +167,8 @@ internal class MemberOps<T> : MemberOps
 
     public override bool IsDefaultValue(object? boxedValue) =>
         boxedValue is null || EqualityComparer<T>.Default.Equals((T)boxedValue, default!);
+
+    public override bool HandlesNull(JsonConverter? converter) => converter is JsonConverter<T> { HandleNull: true };
 
     public override JsonConverter CreateDefaultOnNullConverter(
         JsonConverter? inner,

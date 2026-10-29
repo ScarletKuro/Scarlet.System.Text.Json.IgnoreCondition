@@ -62,6 +62,10 @@ public enum SerializerConfiguration
 [JsonSerializable(typeof(DefaultParameterRecord))]
 [JsonSerializable(typeof(EnumParameterRecord))]
 [JsonSerializable(typeof(UnregisteredGenericModel))]
+[JsonSerializable(typeof(InitOnlyModel))]
+[JsonSerializable(typeof(UnannotatedInitOnlyModel))]
+[JsonSerializable(typeof(NullHandlingConverterModel))]
+[JsonSerializable(typeof(NullHandlingConverterRecord))]
 internal sealed partial class DefaultModeContext : JsonSerializerContext;
 
 [JsonSourceGenerationOptions(GenerationMode = JsonSourceGenerationMode.Metadata)]
@@ -103,6 +107,10 @@ internal sealed partial class DefaultModeContext : JsonSerializerContext;
 [JsonSerializable(typeof(DefaultParameterRecord))]
 [JsonSerializable(typeof(EnumParameterRecord))]
 [JsonSerializable(typeof(UnregisteredGenericModel))]
+[JsonSerializable(typeof(InitOnlyModel))]
+[JsonSerializable(typeof(UnannotatedInitOnlyModel))]
+[JsonSerializable(typeof(NullHandlingConverterModel))]
+[JsonSerializable(typeof(NullHandlingConverterRecord))]
 internal sealed partial class MetadataModeContext : JsonSerializerContext;
 
 public static class Serializers

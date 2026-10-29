@@ -59,14 +59,16 @@ internal sealed class DefaultOnNullConverter<T> : JsonConverter<T>
 
     public override void Write(Utf8JsonWriter writer, T value, JsonSerializerOptions options)
     {
-        // HandleNull also routes nulls here on the write side.
-        if (value is null)
+        // HandleNull also routes nulls here on the write side. Do what the serializer would have done
+        // without this wrapper: let a converter that handles null write it, otherwise write null.
+        JsonConverter<T> inner = Inner(options);
+        if (value is null && !inner.HandleNull)
         {
             writer.WriteNullValue();
             return;
         }
 
-        Inner(options).Write(writer, value, options);
+        inner.Write(writer, value, options);
     }
 
     private JsonConverter<T> Inner(JsonSerializerOptions options) =>

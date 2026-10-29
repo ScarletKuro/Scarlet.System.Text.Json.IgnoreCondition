@@ -104,6 +104,10 @@ public sealed record Credentials(
 A positional `record struct` is deserialized through its parameterless constructor, so there a skipped
 `null` leaves the member at `default`.
 
+With source generation, use `set` rather than `init` on annotated properties. The source generator
+assigns `init` properties through an object initializer, which bypasses the condition, so the library
+refuses them with an explicit error. `init` works with the reflection-based resolver.
+
 ### Applying a condition to every member
 
 Instead of annotating each member, set a default for all of them:
