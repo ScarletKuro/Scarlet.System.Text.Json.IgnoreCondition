@@ -481,6 +481,70 @@ public sealed record NullHandlingConverterRecord(
     [property: JsonConverter(typeof(NullAsTextConverter))]
     string? Name = "initial");
 
+/// <summary>Reads JSON null as -100: registered in the options for <c>int</c>, not on any member.</summary>
+public sealed class NullAsMinusHundredConverter : JsonConverter<int>
+{
+    public override bool HandleNull => true;
+
+    public override int Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) =>
+        reader.TokenType == JsonTokenType.Null ? -100 : reader.GetInt32();
+
+    public override void Write(Utf8JsonWriter writer, int value, JsonSerializerOptions options) =>
+        writer.WriteNumberValue(value);
+}
+
+/// <summary>
+/// Annotated members without member converters. The tests register null-handling converters in the options,
+/// which the serializer then uses for these members.
+/// </summary>
+public sealed class OptionsConverterModel
+{
+    [JsonIgnoreEx(JsonIgnoreConditionEx.WhenReadingNull)]
+    public string? Name { get; set; } = "initial";
+
+    [JsonIgnoreEx(JsonIgnoreConditionEx.WhenReadingNull)]
+    public int? Optional { get; set; } = 3;
+
+    [JsonIgnoreEx(JsonIgnoreConditionEx.WhenReadingNull)]
+    public int Count { get; set; } = 5;
+}
+
+/// <summary>A type whose own <c>[JsonConverter]</c> reads JSON null as a value.</summary>
+[JsonConverter(typeof(TokenConverter))]
+public sealed record Token(string Text);
+
+public sealed class TokenConverter : JsonConverter<Token>
+{
+    public override bool HandleNull => true;
+
+    public override Token Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) =>
+        new(reader.TokenType == JsonTokenType.Null ? "from-null" : reader.GetString()!);
+
+    public override void Write(Utf8JsonWriter writer, Token value, JsonSerializerOptions options) =>
+        writer.WriteStringValue(value.Text);
+}
+
+public sealed class TypeLevelConverterModel
+{
+    [JsonIgnoreEx(JsonIgnoreConditionEx.WhenReadingNull)]
+    public Token? Token { get; set; } = new("initial");
+}
+
+/// <summary>A converter for a base type that accepts int, registered in the options.</summary>
+public sealed class BaseTypeOptionsConverter : JsonConverter<object>
+{
+    public override bool CanConvert(Type typeToConvert) => typeToConvert == typeof(int);
+
+    public override object Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) =>
+        reader.GetInt32();
+
+    public override void Write(Utf8JsonWriter writer, object value, JsonSerializerOptions options) =>
+        writer.WriteNumberValue((int)value);
+}
+
+public sealed record OptionsBaseConverterRecord(
+    [property: JsonIgnoreEx(JsonIgnoreConditionEx.WhenReadingNull)] int Count = 9);
+
 /// <summary>A user enum that is deliberately never registered, not even for the NativeAOT run.</summary>
 public enum Shade
 {

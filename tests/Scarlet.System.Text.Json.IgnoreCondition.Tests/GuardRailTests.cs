@@ -79,6 +79,27 @@ public sealed class GuardRailTests
         public int Count { get; set; } = 3;
     }
 
+    /// <summary>A base-type converter for string that also reads JSON null itself.</summary>
+    public sealed class BaseTypeNullTextConverter : JsonConverter<object>
+    {
+        public override bool HandleNull => true;
+
+        public override bool CanConvert(Type typeToConvert) => typeToConvert == typeof(string);
+
+        public override object? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) =>
+            reader.TokenType == JsonTokenType.Null ? "from-null" : reader.GetString();
+
+        public override void Write(Utf8JsonWriter writer, object value, JsonSerializerOptions options) =>
+            writer.WriteStringValue((string)value);
+    }
+
+    public sealed class BaseTypeNullHandlingPropertyModel
+    {
+        [JsonIgnoreEx(JsonIgnoreConditionEx.WhenReadingNull)]
+        [JsonConverter(typeof(BaseTypeNullTextConverter))]
+        public string? Name { get; set; } = "initial";
+    }
+
     public sealed record BaseTypeConverterParameterModel(
         [property: JsonIgnoreEx(JsonIgnoreConditionEx.WhenReadingNull)]
         [property: JsonConverter(typeof(BaseTypeConverter))] int Count = 3);
@@ -205,6 +226,20 @@ public sealed class GuardRailTests
         NotSupportedException parameter = Assert.Throws<NotSupportedException>(() =>
             Deserialize<BaseTypeConverterParameterModel>("""{"Count":"7"}"""));
         Assert.Contains("only a converter for the member's own type can be wrapped", parameter.Message);
+    }
+
+    /// <summary>
+    /// A settable reference-type member normally keeps its converter. But one that reads JSON null itself
+    /// must be wrapped to keep the null from it, and a base-type converter cannot be wrapped, so refuse
+    /// rather than let it overwrite the initializer.
+    /// </summary>
+    [Fact]
+    public void A_base_type_member_converter_that_reads_null_is_refused()
+    {
+        NotSupportedException error = Assert.Throws<NotSupportedException>(() =>
+            Deserialize<BaseTypeNullHandlingPropertyModel>("""{"Name":null}"""));
+
+        Assert.Contains("only a converter for the member's own type can be wrapped", error.Message);
     }
 
     [Fact]

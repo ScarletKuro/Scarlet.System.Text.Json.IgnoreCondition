@@ -1,5 +1,6 @@
 using System.Reflection;
 using System.Runtime.CompilerServices;
+using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.Json.Serialization.Metadata;
 
@@ -142,13 +143,21 @@ internal sealed class ExtendedIgnoreConditionModifier
             memberType,
             out ParameterInfo? parameter);
 
+        // A member without its own converter uses one from the options or from its type. If that one
+        // reads JSON null itself, it would turn the null into a value before the condition sees it.
+        JsonConverter? typeLevelConverter = property.CustomConverter is null
+            ? FindTypeLevelConverter(memberType, typeInfo.Options)
+            : null;
+        bool typeLevelHandlesNull = ConverterHandlesNull(typeLevelConverter);
+
         // WhenReadingDefault always needs the typed default comparison; WhenReadingNull only needs
         // typed metadata to reach a constructor parameter, to project a value type as T?, or to route
-        // a null past a member converter (see the setter path below).
+        // a null past a converter that handles it (see the setter path below).
         bool needsTypedOps = condition == JsonIgnoreConditionEx.WhenReadingDefault ||
                              isConstructorBound ||
                              IsNonNullableValueType(memberType) ||
-                             property.CustomConverter is not null;
+                             property.CustomConverter is not null ||
+                             typeLevelHandlesNull;
 
         MemberOps? ops = null;
         if (needsTypedOps)
@@ -194,7 +203,7 @@ internal sealed class ExtendedIgnoreConditionModifier
             // other rather than fail later with an InvalidCastException.
             bool wrapsConverter = isConstructorBound ||
                                   ops.SupportsNullableProjection ||
-                                  ops.HandlesNull(property.CustomConverter);
+                                  ConverterHandlesNull(property.CustomConverter);
             if (wrapsConverter &&
                 property.CustomConverter is { } memberConverter &&
                 memberConverter.Type != memberType)
@@ -206,6 +215,26 @@ internal sealed class ExtendedIgnoreConditionModifier
                     $"its converter '{memberConverter.GetType()}' converts '{memberConverter.Type}', not " +
                     $"'{memberType}', and only a converter for the member's own type can be wrapped.");
                 return;
+            }
+
+            // A value type re-declared as T? gets the serializer's Nullable<T> converter around the
+            // converter for T, which passes a null on to that converter if it handles null. Lift it
+            // explicitly instead, the way a member converter is, so the null stays a null.
+            if (typeLevelHandlesNull && ops.SupportsNullableProjection)
+            {
+                if (typeLevelConverter!.Type != memberType)
+                {
+                    Refuse(
+                        isExplicit,
+                        typeInfo,
+                        property,
+                        $"the converter '{typeLevelConverter.GetType()}' in effect for '{memberType}' reads " +
+                        $"JSON null itself but converts '{typeLevelConverter.Type}', so the null cannot be " +
+                        "kept from it.");
+                    return;
+                }
+
+                property.CustomConverter = typeLevelConverter;
             }
         }
 
@@ -267,10 +296,12 @@ internal sealed class ExtendedIgnoreConditionModifier
         }
         else
         {
-            // Every other path skips a JSON null before any converter sees it. A member converter that
-            // handles null itself would turn it into a value first, which the skipping setter would
-            // then assign, so route the null past it. It still reads every other token and writes.
-            if (ops?.HandlesNull(property.CustomConverter) == true)
+            // Every other path skips a JSON null before any converter sees it. A converter that handles
+            // null itself, the member's own or the one in effect for its type, would turn it into a
+            // value first, which the skipping setter would then assign, so route the null past it. The
+            // converter still reads every other token and writes; without a member converter, the
+            // wrapper resolves the one in effect at run time.
+            if (ConverterHandlesNull(property.CustomConverter) || typeLevelHandlesNull)
             {
                 property.CustomConverter = ops!.CreateDefaultOnNullConverter(
                     property.CustomConverter,
@@ -361,6 +392,47 @@ internal sealed class ExtendedIgnoreConditionModifier
             ? $"{type.Name[..type.Name.IndexOf('`', StringComparison.Ordinal)]}<" +
               $"{string.Join(", ", type.GetGenericArguments().Select(CSharpName))}>"
             : type.Name;
+
+    /// <summary>
+    /// The converter the serializer uses for a member without its own, if the user supplied one: the first
+    /// options converter that accepts the type, else a <see cref="JsonConverterAttribute"/> on the type.
+    /// For <c>T?</c> the converter for <c>T</c> counts too, since the serializer builds <c>T?</c> on it.
+    /// Built-in converters are not considered; the serializer reads null for them as documented.
+    /// </summary>
+    private static JsonConverter? FindTypeLevelConverter(Type memberType, JsonSerializerOptions options) =>
+        FindUserConverter(memberType, options) ??
+        (Nullable.GetUnderlyingType(memberType) is { } underlying ? FindUserConverter(underlying, options) : null);
+
+    private static JsonConverter? FindUserConverter(Type type, JsonSerializerOptions options)
+    {
+        foreach (JsonConverter converter in options.Converters)
+        {
+            if (converter.CanConvert(type))
+            {
+                return Expand(converter, type, options);
+            }
+        }
+
+        if (type.GetCustomAttribute<JsonConverterAttribute>(inherit: false) is { } attribute)
+        {
+            JsonConverter? converter = attribute.CreateConverter(type) ??
+                (attribute.ConverterType is { } converterType ? (JsonConverter?)Activator.CreateInstance(converterType) : null);
+            return Expand(converter, type, options);
+        }
+
+        return null;
+    }
+
+    private static JsonConverter? Expand(JsonConverter? converter, Type type, JsonSerializerOptions options) =>
+        converter is JsonConverterFactory factory ? factory.CreateConverter(type, options) : converter;
+
+    /// <summary>
+    /// Whether a converter reads JSON null itself. Decided by the type it converts, which for a converter
+    /// of a base type is not the member type.
+    /// </summary>
+    private static bool ConverterHandlesNull(JsonConverter? converter) =>
+        converter?.Type is { } converted &&
+        MemberOps.Resolve(converted, requireRegistration: false)?.HandlesNull(converter) == true;
 
     /// <summary>
     /// Reflection reports an enum parameter's default value as its underlying integer. That unboxes to the
